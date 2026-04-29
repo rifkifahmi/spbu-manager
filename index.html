@@ -356,6 +356,10 @@ tr.row-saved{opacity:.8}
       <button class="login-tab" id="tab-manager" onclick="switchLoginTab('manager')">🔧 Manager</button>
     </div>
     <div id="login-error" class="login-error">❌ Password salah. Silakan coba lagi.</div>
+    <div class="login-field" id="login-user-field" style="display:none">
+      <label>Nama Pengguna</label>
+      <select class="inp" id="login-user-select" style="padding:12px 14px;font-size:14px;border:1.5px solid #E4E0D8;border-radius:10px;font-family:var(--font)"></select>
+    </div>
     <div class="login-field">
       <label>Password</label>
       <input type="password" id="login-password" placeholder="Masukkan password..." onkeydown="if(event.key==='Enter')doLogin()">
@@ -446,10 +450,40 @@ const CATS={gaji:{label:'Gaji/Upah',bg:'#EAF3DE',color:'#2D6A2D'},listrik:{label
 const DB_KEY='spbu_manager_v1';
 const AUTH_KEY='spbu_auth_session';
 const PWD_KEY='spbu_passwords';
+const USERS_KEY='spbu_users';
 
 // ─── AUTH SYSTEM ──────────────────────────────────────────────
-let currentUser=null; // {role:'owner'|'manager', name:'Owner'|'Manager'}
+let currentUser=null; // {id, role, name, password, menuAccess:[]}
 let loginTab='owner';
+
+// Default menu defs
+const ALL_MENUS=[
+  {id:'dashboard',label:'Dashboard',icon:'🏠'},
+  {id:'input',label:'Input Data',icon:'✚'},
+  {id:'stok',label:'Stok BBM',icon:'⛽'},
+  {id:'laba',label:'Keuntungan',icon:'₿'},
+  {id:'selisih',label:'Losses & Plus',icon:'⚖'},
+  {id:'histori',label:'Histori',icon:'📋'},
+  {id:'rekap',label:'Rekap & Laporan',icon:'📊'},
+  {id:'harga',label:'Harga BBM',icon:'🏷'},
+  {id:'database',label:'Database',icon:'💾'},
+];
+const OWNER_DEFAULT_MENUS=ALL_MENUS.map(m=>m.id);
+const MANAGER_DEFAULT_MENUS=['input','stok','laba','selisih','histori'];
+
+function getUsers(){
+  try{const d=localStorage.getItem(USERS_KEY);return d?JSON.parse(d):getDefaultUsers();}
+  catch(e){return getDefaultUsers();}
+}
+function getDefaultUsers(){
+  const pw=getPasswords();
+  return [
+    {id:'owner',role:'owner',name:'Owner',password:pw.owner,menuAccess:OWNER_DEFAULT_MENUS},
+    {id:'manager',role:'manager',name:'Manager',password:pw.manager,menuAccess:MANAGER_DEFAULT_MENUS},
+  ];
+}
+function saveUsers(users){localStorage.setItem(USERS_KEY,JSON.stringify(users));}
+function getUserById(id){return getUsers().find(u=>u.id===id);}
 
 function getPasswords(){
   try{const d=localStorage.getItem(PWD_KEY);return d?JSON.parse(d):{owner:'owner123',manager:'manager123'};}
@@ -464,20 +498,41 @@ function switchLoginTab(tab){
   document.getElementById('login-btn').className='login-btn '+(tab==='owner'?'':'green');
   document.getElementById('login-password').value='';
   document.getElementById('login-error').classList.remove('show');
+  // Tampilkan selector pengguna untuk manager
+  const userField=document.getElementById('login-user-field');
+  const userSelect=document.getElementById('login-user-select');
+  if(tab==='manager'){
+    const users=getUsers().filter(u=>u.role==='manager');
+    userSelect.innerHTML=users.map(u=>`<option value="${u.id}">${esc(u.name)}</option>`).join('');
+    userField.style.display='block';
+  }else{
+    userField.style.display='none';
+  }
 }
 
 function doLogin(){
   const pwd=document.getElementById('login-password').value;
-  const passwords=getPasswords();
   const errEl=document.getElementById('login-error');
-  if(pwd===passwords[loginTab]){
+  const users=getUsers();
+  let matched=null;
+  if(loginTab==='owner'){
+    matched=users.find(u=>u.role==='owner'&&u.password===pwd);
+  }else{
+    const selectedId=document.getElementById('login-user-select')?.value;
+    if(selectedId){
+      matched=users.find(u=>u.id===selectedId&&u.password===pwd);
+    }else{
+      matched=users.find(u=>u.role==='manager'&&u.password===pwd);
+    }
+  }
+  if(matched){
     errEl.classList.remove('show');
-    currentUser={role:loginTab,name:loginTab==='owner'?'Owner':'Manager'};
+    currentUser={...matched};
     localStorage.setItem(AUTH_KEY,JSON.stringify(currentUser));
     showApp();
   }else{
     errEl.classList.add('show');
-    errEl.textContent='Password salah. Coba lagi.';
+    errEl.textContent='❌ Password salah. Silakan coba lagi.';
     document.getElementById('login-password').value='';
     document.getElementById('login-password').focus();
   }
@@ -494,36 +549,67 @@ function doLogout(){
   switchLoginTab('owner');
 }
 
+function userHasMenu(menuId){
+  if(!currentUser)return false;
+  if(currentUser.role==='owner')return true; // owner selalu bisa akses semua
+  return (currentUser.menuAccess||MANAGER_DEFAULT_MENUS).includes(menuId);
+}
+
 function showApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('main-topbar').style.display='flex';
   document.getElementById('main-layout').style.display='flex';
-  // Update topbar
   const isOwner=currentUser.role==='owner';
   const badge=document.getElementById('tb-role-badge');
-  badge.textContent=isOwner?'👑 Owner':'🔧 Manager';
+  badge.textContent=isOwner?'👑 Owner':'🔧 '+currentUser.name;
   badge.className='role-badge '+(isOwner?'role-owner':'role-manager');
-  document.getElementById('tb-avatar').textContent=isOwner?'O':'M';
-  // Sembunyikan menu yang tidak diizinkan untuk manager
-  const ownerSection=document.getElementById('nav-owner-section');
-  const navRekap=document.getElementById('nav-rekap');
-  const navHarga=document.getElementById('nav-harga');
-  const navDb=document.getElementById('nav-database');
-  if(isOwner){
-    ownerSection.style.display='block';
-    navRekap.style.display='flex';
-    navHarga.style.display='flex';
-    navDb.style.display='flex';
-  }else{
-    ownerSection.style.display='none';
-    navRekap.style.display='none';
-    navHarga.style.display='none';
-    navDb.style.display='none';
-  }
+  const av=document.getElementById('tb-avatar');
+  av.textContent=(currentUser.name||'U').charAt(0).toUpperCase();
+  av.className='user-avatar'+(isOwner?' owner':'');
+  // Build sidebar dynamically
+  buildSidebar();
   init();
 }
 
-// ─── STATE ──────────────────────────────────────────────────
+function buildSidebar(){
+  const isOwner=currentUser&&currentUser.role==='owner';
+  const sidebar=document.getElementById('main-sidebar');
+  if(!sidebar)return;
+  let html='';
+  // Dashboard (owner only)
+  if(isOwner||userHasMenu('dashboard')){
+    html+=`<div class="nav-section">Dashboard</div>
+    <a class="nav-item" onclick="showPage('dashboard')" href="#" id="nav-dashboard">
+      <span class="nav-icon">🏠</span> Dashboard
+    </a><div class="nav-divider"></div>`;
+  }
+  html+='<div class="nav-section">Operasional</div>';
+  const opMenus=['input','stok','laba','selisih'];
+  opMenus.forEach(m=>{
+    const def=ALL_MENUS.find(x=>x.id===m);
+    if(!def)return;
+    if(isOwner||userHasMenu(m))
+      html+=`<a class="nav-item" onclick="showPage('${m}')" href="#" id="nav-${m}"><span class="nav-icon">${def.icon}</span> ${def.label}</a>`;
+  });
+  html+='<div class="nav-divider"></div><div class="nav-section">Data</div>';
+  const dataMenus=['histori','rekap','harga'];
+  dataMenus.forEach(m=>{
+    const def=ALL_MENUS.find(x=>x.id===m);
+    if(!def)return;
+    if(isOwner||userHasMenu(m))
+      html+=`<a class="nav-item" onclick="showPage('${m}')" href="#" id="nav-${m}"><span class="nav-icon">${def.icon}</span> ${def.label}</a>`;
+  });
+  if(isOwner||userHasMenu('database')){
+    html+='<div class="nav-divider"></div><div class="nav-section">Sistem</div>';
+    html+=`<a class="nav-item" onclick="showPage('database')" href="#" id="nav-database"><span class="nav-icon">💾</span> Database</a>`;
+    if(isOwner)
+      html+=`<a class="nav-item" onclick="showPage('users')" href="#" id="nav-users"><span class="nav-icon">👥</span> Kelola Pengguna</a>`;
+  }
+  sidebar.innerHTML=html;
+}
+
+const SH_COLOR={pagi:'bk',siang:'bw',malam:'bp'};
+
 let state={sel:{pagi:true,siang:false,malam:false},shiftSaved:{pagi:false,siang:false,malam:false},biayaItems:[],biayaId:1,savedData:[],harga:{pertalite:10000,hpp_pertalite:9998,pertamax:13200,hpp_pertamax:13235,dexlite:14550,hpp_dexlite:15099,biosolar:6800,hpp_biosolar:6799},riwayatHarga:[]};
 let currentPage='input';
 let histChartInst=null;
@@ -584,18 +670,18 @@ function calcRow(awal,jual,tambah,habis){
 
 // ─── PAGE ROUTER ─────────────────────────────────────────────
 function showPage(name){
-  // Proteksi akses untuk manager
-  if(currentUser&&currentUser.role==='manager'){
-    const ownerOnly=['dashboard','rekap','harga','database'];
-    if(ownerOnly.includes(name)){toast('⚠ Akses terbatas. Fitur ini hanya untuk Owner.');return;}
+  if(!currentUser)return;
+  const isOwner=currentUser.role==='owner';
+  // Proteksi akses
+  if(!isOwner&&name!=='dashboard'){
+    if(!userHasMenu(name)){toast('⚠ Akses terbatas. Hubungi Owner untuk mendapatkan akses.');return;}
   }
+  if(name==='users'&&!isOwner){toast('⚠ Hanya Owner yang bisa mengelola pengguna.');return;}
+
   currentPage=name;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const isOwner=currentUser&&currentUser.role==='owner';
-  // navMap: index di seluruh .nav-item (termasuk yg hidden)
-  const navMap={dashboard:0,input:isOwner?2:0,stok:isOwner?3:1,laba:isOwner?4:2,selisih:isOwner?5:3,histori:isOwner?7:5,rekap:isOwner?8:6,harga:isOwner?9:7,database:isOwner?11:9};
-  const allNav=document.querySelectorAll('.nav-item');
-  if(allNav[navMap[name]])allNav[navMap[name]].classList.add('active');
+  const activeNav=document.getElementById('nav-'+name);
+  if(activeNav)activeNav.classList.add('active');
   const main=e('main-content');
   if(!main)return;
   if(name==='dashboard')renderDashboardPage(main);
@@ -607,6 +693,7 @@ function showPage(name){
   else if(name==='rekap')renderRekapPage(main);
   else if(name==='harga')renderHargaPage(main);
   else if(name==='database')renderDBPage(main);
+  else if(name==='users')renderUsersPage(main);
 }
 
 // ════════════════════════════════════════════════════════════
@@ -910,6 +997,7 @@ function renderShifts(){
         <td id="${sh}-status-${b}" style="font-size:11px;text-align:right"></td>
       </tr>`;
     }).join('');
+    const nextShift=idx<active.length-1?active[idx+1]:null;
     const tambahGrid=BBM.map(b=>{
       const tv=isPagi?(def[b]?.tambah||0):0;
       return`<div class="fg">
@@ -918,6 +1006,24 @@ function renderShifts(){
         <div id="${sh}-stk-cur-${b}" class="cur-stk"></div>
       </div>`;
     }).join('');
+    const tambahTargetSel=nextShift&&!saved?`
+      <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em">Masuk ke:</span>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:500">
+          <input type="radio" name="${sh}-tambah-target" id="${sh}-target-current" value="current" checked onchange="onTambahTargetChange('${sh}')">
+          <span style="display:flex;align-items:center;gap:4px">
+            <span class="bx ${SH_COLOR[sh]||'bk'}" style="font-size:10px">Shift ${cap(sh)} (sekarang)</span>
+          </span>
+        </label>
+        <label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;font-weight:500">
+          <input type="radio" name="${sh}-tambah-target" id="${sh}-target-next" value="next" onchange="onTambahTargetChange('${sh}')">
+          <span style="display:flex;align-items:center;gap:4px">
+            <span class="bx ${SH_COLOR[nextShift]||'bk'}" style="font-size:10px">Shift ${cap(nextShift)} (berikutnya)</span>
+          </span>
+        </label>
+        <span id="${sh}-tambah-target-info" style="font-size:11px;color:var(--text3)"></span>
+      </div>`:'';
+    const tambahNote=nextShift?'':`<div style="font-size:11px;color:var(--text3);margin-top:6px">ℹ Tidak ada shift berikutnya — penambahan masuk ke stok shift ini.</div>`;
     const tglVal=e('f-tanggal')?.value||'';
     const tgl1=isTanggal1(tglVal);
     let autoNote='';
@@ -954,7 +1060,29 @@ function renderShifts(){
           <tbody>${rows}</tbody>
         </table></div>
         <div class="tambah-sec">
-          <div class="tambah-title">+ Penambahan Stok Berjalan <span class="mid-badge">MID-SHIFT</span><span style="font-size:10px;color:var(--text3);font-weight:400">— langsung masuk stok shift ini</span></div>
+          <div class="tambah-title">+ Penambahan Stok
+            <span class="mid-badge">MID-SHIFT</span>
+            ${nextShift&&!saved?`<span style="font-size:10px;color:var(--text3);font-weight:400">— pilih tujuan penambahan</span>`:`<span style="font-size:10px;color:var(--text3);font-weight:400">— langsung masuk stok shift ini</span>`}
+          </div>
+          ${nextShift&&!saved?`
+          <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em">Masuk ke:</span>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text)">
+              <input type="radio" name="${sh}-tambah-target" id="${sh}-target-current" value="current" checked
+                onchange="onTambahTargetChange('${sh}')"
+                style="accent-color:var(--green);width:14px;height:14px">
+              <span class="bx ${SH_COLOR[sh]||'bk'}" style="font-size:11px">Shift ${cap(sh)}</span>
+              <span style="font-size:11px;color:var(--text3);font-weight:400">(berjalan)</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text)">
+              <input type="radio" name="${sh}-tambah-target" id="${sh}-target-next" value="next"
+                onchange="onTambahTargetChange('${sh}')"
+                style="accent-color:var(--amber);width:14px;height:14px">
+              <span class="bx ${SH_COLOR[nextShift]||'bw'}" style="font-size:11px">Shift ${cap(nextShift)}</span>
+              <span style="font-size:11px;color:var(--text3);font-weight:400">(berikutnya)</span>
+            </label>
+            <span id="${sh}-tambah-target-info" style="font-size:11px;color:var(--text2);margin-left:auto"></span>
+          </div>`:`<div class="nt nt-i" style="margin-bottom:10px;font-size:11px">ℹ Tidak ada shift berikutnya — penambahan langsung masuk stok shift ini.</div>`}
           <div class="form-row cols-4">${tambahGrid}</div>
         </div>
         <div id="notice-${sh}" style="margin-top:12px"></div>
@@ -1047,14 +1175,83 @@ function onFC(sh,b){
   updatePreviewIfOpen();
 }
 function onHabis(sh,b){onFC(sh,b);}
+function onTambahTargetChange(sh){
+  const active=SO.filter(s=>state.sel[s]);
+  const idx=active.indexOf(sh);
+  const nextSh=idx<active.length-1?active[idx+1]:null;
+  const targetEl=document.querySelector(`input[name="${sh}-tambah-target"]:checked`);
+  const target=targetEl?targetEl.value:'current';
+  const infoEl=e(`${sh}-tambah-target-info`);
+  if(infoEl){
+    if(target==='next'&&nextSh){
+      infoEl.textContent=`→ Akan ditambahkan ke stok awal Shift ${cap(nextSh)}`;
+      infoEl.style.color='var(--amber)';
+    }else{
+      infoEl.textContent='→ Ditambahkan ke stok shift berjalan';
+      infoEl.style.color='var(--green)';
+    }
+  }
+  // Recalc — penambahan ke next shift mempengaruhi propagasi
+  BBM.forEach(b=>{
+    const el2=e(`${sh}-stk-cur-${b}`);
+    const tambah=gv(`${sh}-tambah-${b}`);
+    if(el2){
+      if(tambah>0&&target==='current'){
+        const awal=gv(`${sh}-awal-${b}`);const jual=gv(`${sh}-jual-${b}`);const habis=gck(`${sh}-habis-${b}`);
+        const r=calcRow(awal,jual,tambah,habis);
+        el2.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;
+      }else if(tambah>0&&target==='next'){
+        el2.textContent=`→ +${fN(tambah)} ltr ke Shift ${cap(nextSh)}`;
+        el2.style.color='var(--amber)';
+      }else{el2.textContent='';}
+    }
+  });
+  calcAll();
+}
+
+function getTambahTarget(sh){
+  const el=document.querySelector(`input[name="${sh}-tambah-target"]:checked`);
+  return el?el.value:'current';
+}
+
+function propagate(fromSh,toSh){
+  BBM.forEach(b=>{
+    const awal=gv(`${fromSh}-awal-${b}`);const habis=gck(`${fromSh}-habis-${b}`);
+    const jual=gv(`${fromSh}-jual-${b}`);
+    // Cek apakah tambah di fromSh ditujukan ke toSh atau ke shift fromSh sendiri
+    const tambahTarget=getTambahTarget(fromSh);
+    const tambahForCurrent=tambahTarget==='current'?gv(`${fromSh}-tambah-${b}`):0;
+    const tambahForNext=tambahTarget==='next'?gv(`${fromSh}-tambah-${b}`):0;
+    const r=calcRow(awal,jual,tambahForCurrent,habis);
+    const toEl=e(`${toSh}-awal-${b}`);
+    if(toEl&&toEl.readOnly&&!state.shiftSaved[toSh]){
+      // Stok awal shift berikutnya = stok akhir fromSh + tambahan yang ditujukan ke shift berikutnya
+      toEl.value=Math.max(0,r.stokAkhirEfektif+tambahForNext);
+    }
+  });calcShift(toSh);
+}
+
 function onTambahChange(sh,b){
-  const awal=gv(`${sh}-awal-${b}`);const jual=gv(`${sh}-jual-${b}`);const tambah=gv(`${sh}-tambah-${b}`);const habis=gck(`${sh}-habis-${b}`);
-  const r=calcRow(awal,jual,tambah,habis);
-  const el2=e(`${sh}-stk-cur-${b}`);if(el2){if(tambah>0){el2.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;}else{el2.textContent='';}}
+  const target=getTambahTarget(sh);
+  const active=SO.filter(s=>state.sel[s]);
+  const idx=active.indexOf(sh);
+  const nextSh=idx<active.length-1?active[idx+1]:null;
+  const tambah=gv(`${sh}-tambah-${b}`);
+  const el2=e(`${sh}-stk-cur-${b}`);
+  if(el2){
+    if(tambah>0&&target==='next'&&nextSh){
+      el2.textContent=`→ +${fN(tambah)} ltr ke Shift ${cap(nextSh)}`;
+      el2.style.color='var(--amber)';
+    }else if(tambah>0){
+      const awal=gv(`${sh}-awal-${b}`);const jual=gv(`${sh}-jual-${b}`);const habis=gck(`${sh}-habis-${b}`);
+      const r=calcRow(awal,jual,tambah,habis);
+      el2.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;
+      el2.style.color='var(--green)';
+    }else{el2.textContent='';}
+  }
   onFC(sh,b);
 }
 
-// ─── AKUMULASI ───────────────────────────────────────────────
 function getAkum(){
   const active=SO.filter(s=>state.sel[s]);const out={};
   BBM.forEach(b=>{
@@ -1884,6 +2081,207 @@ function printRekap(){
   </body></html>`);
   w.document.close();
   setTimeout(()=>w.print(),500);
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: KELOLA PENGGUNA (OWNER ONLY)
+// ════════════════════════════════════════════════════════════
+function renderUsersPage(main){
+  const users=getUsers();
+  const editId=window._editUserId||null;
+
+  const userRows=users.map(u=>{
+    const isOwner=u.role==='owner';
+    const menuCount=(u.menuAccess||[]).length;
+    const badgeClass=isOwner?'role-owner':'role-manager';
+    const badgeText=isOwner?'👑 Owner':'🔧 Manager';
+    return`<tr>
+      <td>
+        <div style="font-weight:600">${esc(u.name)}</div>
+        <div style="font-size:11px;color:var(--text3)">ID: ${u.id}</div>
+      </td>
+      <td><span class="role-badge ${badgeClass}" style="font-size:11px">${badgeText}</span></td>
+      <td style="font-size:12px;color:var(--text2)">${isOwner?'Semua menu':menuCount+' menu'}</td>
+      <td style="font-size:12px">
+        <span style="background:var(--surface2);border:1px solid var(--border);padding:3px 8px;border-radius:6px;font-family:monospace;font-size:11px;letter-spacing:.05em">
+          ${'•'.repeat(Math.min(u.password.length,8))}
+        </span>
+      </td>
+      <td>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn btn-edit btn-sm" onclick="editUser('${u.id}')">✏ Edit</button>
+          ${!isOwner?`<button class="btn btn-reset btn-sm" onclick="deleteUser('${u.id}')">🗑 Hapus</button>`:''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  // Form tambah/edit
+  const editUser=editId?users.find(u=>u.id===editId):null;
+  const formTitle=editUser?`Edit Pengguna — ${esc(editUser.name)}`:'Tambah Pengguna Baru';
+  const menuChecks=ALL_MENUS.map(m=>{
+    const checked=editUser?(editUser.menuAccess||[]).includes(m.id):MANAGER_DEFAULT_MENUS.includes(m.id);
+    return`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px">
+      <input type="checkbox" id="menu-${m.id}" ${checked?'checked':''} style="accent-color:var(--blue);width:14px;height:14px">
+      <span style="margin-right:4px">${m.icon}</span> ${m.label}
+    </label>`;
+  }).join('');
+
+  main.innerHTML=`
+  <div class="page-header">
+    <div class="page-title">👥 Kelola Pengguna</div>
+    <div class="page-sub">Tambah, edit, dan atur hak akses menu untuk setiap pengguna</div>
+  </div>
+
+  <!-- DAFTAR PENGGUNA -->
+  <div class="card">
+    <div class="card-title">Daftar Pengguna
+      <button class="btn btn-primary btn-sm" onclick="window._editUserId=null;renderUsersPage(e('main-content'))">+ Tambah User</button>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th style="text-align:left">Nama</th>
+        <th style="text-align:left">Role</th>
+        <th>Akses Menu</th>
+        <th>Password</th>
+        <th>Aksi</th>
+      </tr></thead>
+      <tbody>${userRows}</tbody>
+    </table></div>
+  </div>
+
+  <!-- FORM TAMBAH / EDIT -->
+  <div class="card" style="border:2px solid var(--blue-light)">
+    <div class="card-title" style="color:var(--blue)">${editUser?'✏':'+'} ${formTitle}</div>
+
+    <div class="form-row cols-2" style="margin-bottom:14px">
+      <div class="fg">
+        <label>Nama Pengguna</label>
+        <input type="text" class="inp" id="user-name" placeholder="cth: Manager Pagi" value="${esc(editUser?.name||'')}">
+      </div>
+      <div class="fg">
+        <label>Role</label>
+        <select class="inp" id="user-role" onchange="renderUsersPage(e('main-content'))" ${editUser?.role==='owner'?'disabled':''}>
+          <option value="manager" ${!editUser||editUser.role==='manager'?'selected':''}>🔧 Manager</option>
+          <option value="owner" ${editUser?.role==='owner'?'selected':''}>👑 Owner</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-row cols-2" style="margin-bottom:18px">
+      <div class="fg">
+        <label>${editUser?'Password Baru (kosongkan jika tidak berubah)':'Password'}</label>
+        <input type="password" class="inp" id="user-password" placeholder="${editUser?'Kosongkan jika tidak ganti':'Minimal 4 karakter'}">
+      </div>
+      <div class="fg">
+        <label>Konfirmasi Password</label>
+        <input type="password" class="inp" id="user-password2" placeholder="Ulangi password">
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">
+        🔐 Hak Akses Menu
+        <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:8px">Centang menu yang bisa diakses pengguna ini</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">
+        ${menuChecks}
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="setAllMenus(true)">✓ Pilih Semua</button>
+        <button class="btn btn-ghost btn-sm" onclick="setAllMenus(false)">✗ Hapus Semua</button>
+        <button class="btn btn-ghost btn-sm" onclick="setMenuPreset('manager')">Set Default Manager</button>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      ${editUser?`<button class="btn btn-ghost" onclick="window._editUserId=null;renderUsersPage(e('main-content'))">Batal</button>`:''}
+      <button class="btn btn-save" onclick="saveUser('${editUser?.id||''}')">
+        💾 ${editUser?'Simpan Perubahan':'Tambah Pengguna'}
+      </button>
+    </div>
+  </div>`;
+
+  // Restore nilai dari form jika baru render ulang
+  if(editUser){
+    const roleEl=e('user-role');
+    if(roleEl)roleEl.value=editUser.role;
+  }
+}
+
+function setAllMenus(val){
+  ALL_MENUS.forEach(m=>{const el=e('menu-'+m.id);if(el)el.checked=val;});
+}
+function setMenuPreset(role){
+  ALL_MENUS.forEach(m=>{
+    const el=e('menu-'+m.id);
+    if(el)el.checked=MANAGER_DEFAULT_MENUS.includes(m.id);
+  });
+}
+
+function editUser(id){
+  window._editUserId=id;
+  renderUsersPage(e('main-content'));
+  setTimeout(()=>{
+    const users=getUsers();
+    const u=users.find(x=>x.id===id);
+    if(u){
+      ALL_MENUS.forEach(m=>{const el=e('menu-'+m.id);if(el)el.checked=(u.menuAccess||[]).includes(m.id);});
+    }
+  },50);
+}
+
+function deleteUser(id){
+  const users=getUsers();
+  const u=users.find(x=>x.id===id);
+  if(!u||u.role==='owner'){toast('⚠ Tidak bisa menghapus akun Owner!');return;}
+  if(!confirm(`Hapus pengguna "${u.name}"? Aksi ini tidak bisa dibatalkan.`))return;
+  const updated=users.filter(x=>x.id!==id);
+  saveUsers(updated);
+  toast('✓ Pengguna dihapus.');
+  window._editUserId=null;
+  renderUsersPage(e('main-content'));
+}
+
+function saveUser(existingId){
+  const name=(e('user-name')?.value||'').trim();
+  const role=e('user-role')?.value||'manager';
+  const pwd=e('user-password')?.value||'';
+  const pwd2=e('user-password2')?.value||'';
+
+  if(!name){toast('⚠ Nama pengguna tidak boleh kosong!');return;}
+  if(!existingId&&!pwd){toast('⚠ Password wajib diisi untuk pengguna baru!');return;}
+  if(pwd&&pwd.length<4){toast('⚠ Password minimal 4 karakter!');return;}
+  if(pwd&&pwd!==pwd2){toast('⚠ Password dan konfirmasi tidak sama!');return;}
+
+  // Kumpulkan menu access yang dicentang
+  const menuAccess=ALL_MENUS.filter(m=>{const el=e('menu-'+m.id);return el&&el.checked;}).map(m=>m.id);
+  if(role==='manager'&&menuAccess.length===0){toast('⚠ Pilih minimal 1 menu akses!');return;}
+
+  const users=getUsers();
+
+  if(existingId){
+    // Edit
+    const idx=users.findIndex(u=>u.id===existingId);
+    if(idx<0){toast('⚠ Pengguna tidak ditemukan!');return;}
+    users[idx].name=name;
+    users[idx].role=role;
+    users[idx].menuAccess=role==='owner'?OWNER_DEFAULT_MENUS:menuAccess;
+    if(pwd)users[idx].password=pwd;
+    saveUsers(users);
+    toast('✓ Perubahan disimpan untuk '+name);
+  }else{
+    // Tambah baru
+    const newId='user_'+Date.now();
+    users.push({
+      id:newId,role,name,password:pwd,
+      menuAccess:role==='owner'?OWNER_DEFAULT_MENUS:menuAccess
+    });
+    saveUsers(users);
+    toast('✓ Pengguna "'+name+'" berhasil ditambahkan!');
+  }
+  window._editUserId=null;
+  renderUsersPage(e('main-content'));
 }
 
 function renderHargaPage(main){
