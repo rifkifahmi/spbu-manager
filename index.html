@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPBU Manager</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#F8F7F4;--surface:#FFFFFF;--surface2:#F1EFE9;--border:#E4E0D8;--border2:#D0CCBF;
+  --text:#1A1916;--text2:#6B6760;--text3:#A09C95;
+  --green:#2D6A2D;--green-bg:#EAF3DE;--green-light:#9FCF9F;
+  --red:#A32D2D;--red-bg:#FCEBEB;--red-light:#F7C1C1;
+  --blue:#185FA5;--blue-bg:#E6F1FB;--blue-light:#85B7EB;
+  --amber:#854F0B;--amber-bg:#FAEEDA;--amber-light:#FAC775;
+  --purple:#534AB7;--purple-bg:#EEEDFE;--purple-light:#AFA9EC;
+  --radius:8px;--radius-lg:12px;--shadow:0 1px 3px rgba(0,0,0,.08);
+  --font:'IBM Plex Sans',system-ui,sans-serif;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+
+/* TOPBAR */
+.topbar{background:var(--text);color:#fff;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
+.topbar-brand{font-size:16px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:10px}
+.topbar-brand span{background:#F5C518;color:var(--text);padding:2px 7px;border-radius:4px;font-size:12px;font-weight:700;letter-spacing:.5px}
+.topbar-info{font-size:12px;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:16px}
+.db-badge{background:rgba(255,255,255,.12);border:.5px solid rgba(255,255,255,.2);padding:3px 9px;border-radius:20px;font-size:11px;display:flex;align-items:center;gap:5px}
+.db-dot{width:6px;height:6px;border-radius:50%;background:#4CAF50}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 52px)}
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);padding:16px 0;flex-shrink:0;position:sticky;top:52px;height:calc(100vh - 52px);overflow-y:auto}
+.main{flex:1;padding:24px;overflow-x:hidden}
+
+/* SIDEBAR NAV */
+.nav-section{padding:4px 12px 8px;font-size:10px;font-weight:700;letter-spacing:.08em;color:var(--text3);text-transform:uppercase;margin-top:8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:8px 16px;font-size:13px;color:var(--text2);cursor:pointer;border-left:2px solid transparent;transition:all .15s;text-decoration:none}
+.nav-item:hover{background:var(--surface2);color:var(--text)}
+.nav-item.active{background:var(--blue-bg);color:var(--blue);border-left-color:var(--blue);font-weight:500}
+.nav-item .nav-icon{font-size:15px;width:18px;text-align:center}
+.nav-divider{height:1px;background:var(--border);margin:8px 12px}
+
+/* PAGE HEADER */
+.page-header{margin-bottom:20px}
+.page-title{font-size:20px;font-weight:600;color:var(--text);margin-bottom:4px}
+.page-sub{font-size:13px;color:var(--text2)}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:14px;display:flex;align-items:center;justify-content:space-between}
+
+/* GRID */
+.g4{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.metric{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:14px;cursor:default}
+.metric:hover{border-color:var(--border2)}
+.metric-label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.metric-value{font-size:20px;font-weight:700;color:var(--text)}
+.metric-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.metric-value.c-green{color:var(--green)}
+.metric-value.c-red{color:var(--red)}
+.metric-value.c-blue{color:var(--blue)}
+.metric-value.c-purple{color:var(--purple)}
+.metric-value.c-amber{color:var(--amber)}
+
+/* SHIFT HEADER */
+.shift-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:16px;overflow:hidden;box-shadow:var(--shadow)}
+.shift-hdr{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;flex-wrap:wrap;gap:8px}
+.shift-hdr.sh-p{background:var(--green-bg);border-bottom:1px solid var(--green-light)}
+.shift-hdr.sh-s{background:var(--amber-bg);border-bottom:1px solid var(--amber-light)}
+.shift-hdr.sh-m{background:var(--purple-bg);border-bottom:1px solid var(--purple-light)}
+.shift-name{font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px}
+.shift-dot{width:8px;height:8px;border-radius:50%}
+.dp{background:var(--green)}.ds{background:var(--amber)}.dm{background:var(--purple)}
+.shift-time{font-size:11px;color:var(--text2);margin-left:4px}
+.shift-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.shift-content{padding:16px 20px}
+
+/* STATE BADGE */
+.state-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;display:inline-flex;align-items:center;gap:4px}
+.sb-edit{background:var(--amber-bg);color:var(--amber);border:.5px solid var(--amber-light)}
+.sb-saved{background:var(--green-bg);color:var(--green);border:.5px solid var(--green-light)}
+
+/* BUTTONS */
+.btn{padding:7px 14px;font-size:12px;border-radius:var(--radius);cursor:pointer;font-weight:500;border:1px solid transparent;font-family:var(--font);transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.btn-primary{background:var(--text);color:#fff;border-color:var(--text)}
+.btn-primary:hover{opacity:.87}
+.btn-save{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-save:hover{opacity:.87}
+.btn-edit{background:var(--surface);color:var(--text2);border-color:var(--border)}
+.btn-edit:hover{background:var(--surface2);color:var(--text)}
+.btn-reset{background:var(--surface);color:var(--red);border-color:var(--red-light)}
+.btn-reset:hover{background:var(--red-bg)}
+.btn-danger{background:var(--red);color:#fff;border-color:var(--red)}
+.btn-danger:hover{opacity:.87}
+.btn-ghost{background:none;color:var(--text2);border-color:var(--border)}
+.btn-ghost:hover{background:var(--surface2)}
+.btn-sm{padding:4px 10px;font-size:11px}
+.btn-lg{padding:10px 20px;font-size:14px}
+.btn-del{width:28px;height:28px;padding:0;justify-content:center;background:none;color:var(--text3);border-color:var(--border)}
+.btn-del:hover{background:var(--red-bg);color:var(--red);border-color:var(--red-light)}
+
+/* FORMS */
+.form-row{display:grid;gap:12px;margin-bottom:12px}
+.form-row.cols-2{grid-template-columns:1fr 1fr}
+.form-row.cols-3{grid-template-columns:1fr 1fr 1fr}
+.form-row.cols-4{grid-template-columns:repeat(4,1fr)}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:11px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.05em}
+.inp{padding:8px 10px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);font-family:var(--font);width:100%;transition:border .15s}
+.inp:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.1)}
+.inp[readonly]{background:var(--surface2);color:var(--text3);cursor:not-allowed;border-color:transparent}
+.inp-num{text-align:right}
+.inp-auto{background:var(--blue-bg);color:var(--blue);border-color:var(--blue-light)}
+.inp-tambah{background:var(--green-bg);color:var(--green);border-color:var(--green-light)}
+select.inp{cursor:pointer}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead th{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;padding:8px 10px;text-align:right;border-bottom:2px solid var(--border);background:var(--surface2);white-space:nowrap}
+thead th:first-child{text-align:left}
+tbody td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody td:first-child{text-align:left}
+tbody tr:hover{background:var(--surface2)}
+tbody tr:last-child td{border-bottom:none}
+tfoot td{font-weight:700;padding:8px 10px;text-align:right;border-top:2px solid var(--border);background:var(--surface2)}
+tfoot td:first-child{text-align:left}
+
+/* ROW STATES */
+tr.row-losses td{background:rgba(252,235,235,.4)!important}
+tr.row-losses td:first-child{border-left:3px solid var(--red)}
+tr.row-plus td{background:rgba(238,237,254,.4)!important}
+tr.row-plus td:first-child{border-left:3px solid var(--purple)}
+tr.row-saved{opacity:.8}
+
+/* TAGS & BADGES */
+.tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.tp{background:var(--green-bg);color:var(--green)}
+.tx{background:var(--blue-bg);color:var(--blue)}
+.td{background:var(--amber-bg);color:var(--amber)}
+.tb{background:var(--purple-bg);color:var(--purple)}
+.bx{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+.bk{background:var(--green-bg);color:var(--green)}
+.bl{background:var(--red-bg);color:var(--red)}
+.bp{background:var(--purple-bg);color:var(--purple)}
+.bw{background:var(--amber-bg);color:var(--amber)}
+.bn{background:var(--blue-bg);color:var(--blue)}
+.cat-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+
+/* PILL */
+.pill{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:600;min-width:80px;justify-content:flex-end}
+.pill-ok{background:var(--surface2);color:var(--text)}
+.pill-rendah{background:var(--amber-bg);color:var(--amber)}
+.pill-zero-l{background:var(--red-bg);color:var(--red)}
+.pill-zero-p{background:var(--purple-bg);color:var(--purple)}
+.pill-new{background:var(--green-bg);color:var(--green);border:.5px solid var(--green-light)}
+
+/* LOSSES/PLUS AUTO */
+.losses-val{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:600;color:var(--red);background:var(--red-bg);white-space:nowrap}
+.plus-val{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:600;color:var(--purple);background:var(--purple-bg);white-space:nowrap}
+
+/* NOTICES */
+.nt{display:flex;gap:8px;padding:10px 12px;border-radius:var(--radius);font-size:12px;margin-bottom:6px;line-height:1.5;align-items:flex-start;border-left:3px solid}
+.nt-d{background:var(--red-bg);color:var(--red);border-left-color:var(--red)}
+.nt-p{background:var(--purple-bg);color:var(--purple);border-left-color:var(--purple)}
+.nt-w{background:var(--amber-bg);color:var(--amber);border-left-color:var(--amber)}
+.nt-i{background:var(--blue-bg);color:var(--blue);border-left-color:var(--blue)}
+.nt-s{background:var(--green-bg);color:var(--green);border-left-color:var(--green)}
+
+/* FORMULA BOX */
+.formula-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px;font-size:12px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+.feq{background:var(--surface);border:1px solid var(--border);border-radius:4px;padding:3px 8px;font-family:'IBM Plex Mono',monospace;font-size:11px}
+
+/* PENAMBAHAN MID-SHIFT */
+.tambah-sec{margin-top:14px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px dashed var(--border2)}
+.tambah-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.mid-badge{background:var(--blue-bg);color:var(--blue);padding:2px 7px;border-radius:10px;font-size:10px;font-weight:700}
+.cur-stk{font-size:11px;font-weight:600;color:var(--green);margin-top:4px;text-align:right}
+
+/* SEPARATOR */
+.sep{height:1px;background:var(--border);margin:14px 0}
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:13px}
+.rrow.tot{font-weight:700;font-size:14px;border-top:2px solid var(--border);padding-top:10px;margin-top:4px}
+.rl{color:var(--text2)}
+.rv{color:var(--text);font-weight:500}
+
+/* BIAYA TABLE */
+.biaya-add{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:14px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px solid var(--border)}
+.fg-ket{flex:2;min-width:140px}
+.fg-cat{flex:0 0 120px}
+.fg-nom{flex:0 0 130px}
+
+/* DB PANEL */
+.db-panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px}
+.db-stat{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.db-item{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:10px 14px;flex:1;min-width:120px}
+.db-item-label{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.db-item-val{font-size:16px;font-weight:700;color:var(--text)}
+
+/* SNAV */
+.snav{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.snavbtn{padding:5px 12px;font-size:12px;border:1px solid var(--border);border-radius:20px;cursor:pointer;background:none;color:var(--text2);font-family:var(--font);font-weight:500;transition:all .15s}
+.snavbtn:hover{background:var(--surface2)}
+.snavbtn.active{background:var(--text);color:#fff;border-color:var(--text)}
+
+/* HIST */
+.hist-row{display:grid;grid-template-columns:100px 60px 1fr 90px 55px;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px}
+.hist-row:last-child{border-bottom:none}
+.hist-head{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em}
+
+/* HARGA TABLE */
+.harga-inp{width:100%;padding:6px 9px;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);text-align:right;font-family:var(--font)}
+.harga-inp:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.1)}
+
+/* RESPONSIVE */
+@media(max-width:768px){
+  .sidebar{display:none}
+  .main{padding:16px}
+  .form-row.cols-4{grid-template-columns:1fr 1fr}
+  .g4{grid-template-columns:1fr 1fr}
+}
+
+/* CHART */
+.chart-wrap{position:relative;width:100%;height:220px}
+
+/* FLOW */
+.flow-arrow{text-align:center;font-size:11px;color:var(--text3);padding:6px 0;display:flex;align-items:center;justify-content:center;gap:6px}
+
+/* PREVIEW */
+.preview-section{background:var(--surface);border:2px solid var(--green-light);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px}
+.preview-title{font-size:15px;font-weight:700;color:var(--green);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;right:24px;background:var(--text);color:#fff;padding:11px 20px;border-radius:var(--radius);font-size:13px;font-weight:500;opacity:0;transition:opacity .3s;pointer-events:none;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.15)}
+.toast.show{opacity:1}
+
+/* EMPTY */
+.empty-state{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+
+/* LEGEND */
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--text2)}
+.ldot{width:10px;height:10px;border-radius:3px;display:inline-block}
+
+/* CONFIRM MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.modal{background:var(--surface);border-radius:var(--radius-lg);padding:24px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+.modal-title{font-size:15px;font-weight:700;margin-bottom:8px}
+.modal-body{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-brand">
+    <span>SPBU</span> Manager
+  </div>
+  <div class="topbar-info">
+    <div class="db-badge"><span class="db-dot"></span> LocalStorage Active</div>
+    <span id="tb-date" style="font-size:12px;color:rgba(255,255,255,.5)"></span>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+  <!-- SIDEBAR -->
+  <nav class="sidebar">
+    <div class="nav-section">Operasional</div>
+    <a class="nav-item active" onclick="showPage('input')" href="#">
+      <span class="nav-icon">✚</span> Input Data
+    </a>
+    <a class="nav-item" onclick="showPage('stok')" href="#">
+      <span class="nav-icon">⛽</span> Stok BBM
+    </a>
+    <a class="nav-item" onclick="showPage('laba')" href="#">
+      <span class="nav-icon">₿</span> Keuntungan
+    </a>
+    <a class="nav-item" onclick="showPage('selisih')" href="#">
+      <span class="nav-icon">⚖</span> Losses & Plus
+    </a>
+    <div class="nav-divider"></div>
+    <div class="nav-section">Data</div>
+    <a class="nav-item" onclick="showPage('histori')" href="#">
+      <span class="nav-icon">📋</span> Histori
+    </a>
+    <a class="nav-item" onclick="showPage('harga')" href="#">
+      <span class="nav-icon">🏷</span> Harga BBM
+    </a>
+    <div class="nav-divider"></div>
+    <div class="nav-section">Sistem</div>
+    <a class="nav-item" onclick="showPage('database')" href="#">
+      <span class="nav-icon">💾</span> Database
+    </a>
+  </nav>
+
+  <!-- MAIN -->
+  <main class="main" id="main-content"></main>
+</div>
+
+<div class="toast" id="toast"></div>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ─── CONSTANTS ──────────────────────────────────────────────
+const BBM=['pertalite','pertamax','dexlite','biosolar'];
+const BL={pertalite:'Pertalite',pertamax:'Pertamax',dexlite:'Dexlite',biosolar:'Biosolar'};
+const BT={pertalite:'tp',pertamax:'tx',dexlite:'td',biosolar:'tb'};
+const BATAS={pertalite:3000,pertamax:2000,dexlite:1500,biosolar:3000};
+const HARI=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const SO=['pagi','siang','malam'];
+const SI={pagi:{label:'Shift Pagi',hdr:'sh-p',dot:'dp',time:'06.00–14.00'},siang:{label:'Shift Siang',hdr:'sh-s',dot:'ds',time:'14.00–22.00'},malam:{label:'Shift Malam',hdr:'sh-m',dot:'dm',time:'22.00–06.00'}};
+const DEF={pagi:{pertalite:{awal:0,jual:0,tambah:0},pertamax:{awal:0,jual:0,tambah:0},dexlite:{awal:0,jual:0,tambah:0},biosolar:{awal:0,jual:0,tambah:0}},siang:{pertalite:{jual:0,tambah:0},pertamax:{jual:0,tambah:0},dexlite:{jual:0,tambah:0},biosolar:{jual:0,tambah:0}},malam:{pertalite:{jual:0,tambah:0},pertamax:{jual:0,tambah:0},dexlite:{jual:0,tambah:0},biosolar:{jual:0,tambah:0}}};
+const CATS={gaji:{label:'Gaji/Upah',bg:'#EAF3DE',color:'#2D6A2D'},listrik:{label:'Listrik & Air',bg:'#E6F1FB',color:'#185FA5'},perawatan:{label:'Perawatan',bg:'#FAEEDA',color:'#854F0B'},administrasi:{label:'Administrasi',bg:'#EEEDFE',color:'#534AB7'},lainnya:{label:'Lain-lain',bg:'#F1EFE8',color:'#5F5E5A'}};
+const DB_KEY='spbu_manager_v1';
+
+// ─── STATE ──────────────────────────────────────────────────
+let state={sel:{pagi:true,siang:false,malam:false},shiftSaved:{pagi:false,siang:false,malam:false},biayaItems:[],biayaId:1,savedData:[],harga:{pertalite:10000,hpp_pertalite:9998,pertamax:13200,hpp_pertamax:13235,dexlite:14550,hpp_dexlite:15099,biosolar:6800,hpp_biosolar:6799},riwayatHarga:[]};
+let currentPage='input';
+let histChartInst=null;
+
+// ─── LOCALSTORAGE ────────────────────────────────────────────
+function dbSave(){try{localStorage.setItem(DB_KEY,JSON.stringify(state));}catch(err){toast('⚠ Gagal menyimpan ke database: '+err.message);}}
+function dbLoad(){try{const d=localStorage.getItem(DB_KEY);if(d){const p=JSON.parse(d);state={...state,...p};}}catch(e){toast('⚠ Gagal memuat database');}}
+
+// ─── HELPERS ────────────────────────────────────────────────
+const e=id=>document.getElementById(id);
+const gv=id=>{const el=e(id);if(!el)return 0;return parseFloat((el.value||'').replace(/\./g,'').replace(',','.'))||0};
+const gck=id=>{const el=e(id);return el?el.checked:false};
+const st=(id,v,cls)=>{const el=e(id);if(el){el.textContent=v;if(cls!==undefined)el.className=cls}};
+const fN=v=>Math.round(v).toLocaleString('id');
+const fR=v=>{const s=v<0?'-':'';const a=Math.abs(Math.round(v));if(a>=1e9)return s+'Rp '+(a/1e9).toFixed(2)+' M';if(a>=1e6)return s+'Rp '+(a/1e6).toFixed(1)+' jt';return s+'Rp '+a.toLocaleString('id')};
+const fRF=v=>{const s=v<0?'-':'';return s+'Rp '+Math.abs(Math.round(v)).toLocaleString('id')};
+const gHJ=b=>state.harga[b]||0;
+const gHPP=b=>state.harga['hpp_'+b]||0;
+
+// Ambil harga yang berlaku pada tanggal tertentu dari riwayat
+function getHargaPadaTanggal(tanggal,b){
+  if(!state.riwayatHarga||!state.riwayatHarga.length) return {hj:gHJ(b),hpp:gHPP(b)};
+  // Cari riwayat yang berlaku pada tanggal tsb (tanggalBerlaku <= tanggal)
+  const sorted=[...state.riwayatHarga].sort((a,z)=>a.tanggal>z.tanggal?-1:1);
+  const match=sorted.find(r=>r.tanggal<=tanggal);
+  if(!match) return {hj:gHJ(b),hpp:gHPP(b)};
+  return {hj:match.harga[b]||gHJ(b),hpp:match.harga['hpp_'+b]||gHPP(b)};
+}
+
+// Simpan harga saat ini ke riwayat dengan tanggal berlaku
+function simpanRiwayatHarga(tanggalBerlaku,keterangan=''){
+  if(!state.riwayatHarga) state.riwayatHarga=[];
+  const snapshot={...state.harga};
+  // Cek apakah sudah ada riwayat untuk tanggal ini
+  const idx=state.riwayatHarga.findIndex(r=>r.tanggal===tanggalBerlaku);
+  const rec={tanggal:tanggalBerlaku,harga:snapshot,keterangan,savedAt:new Date().toISOString()};
+  if(idx>=0) state.riwayatHarga[idx]=rec;
+  else state.riwayatHarga.unshift(rec);
+  state.riwayatHarga.sort((a,z)=>a.tanggal>z.tanggal?-1:1);
+  dbSave();
+}
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
+const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+function toast(msg,dur=2500){const t=e('toast');if(!t)return;t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
+
+// ─── LOGIKA STOK ────────────────────────────────────────────
+// LOSSES = Awal − Jual  (habis dicentang)
+// PLUS   = Jual − Awal  (jual > awal otomatis)
+// Penambahan mid-shift langsung masuk stok berjalan shift tersebut
+function calcRow(awal,jual,tambah,habis){
+  const selisih=awal-jual;
+  if(habis){const losses=Math.max(0,selisih);return{catatan:0,losses,plus:0,jualEfektif:jual,stokBaru:tambah,stokAkhirEfektif:tambah,isLocked:true,lockType:'losses'};}
+  if(selisih<0){const plus=Math.abs(selisih);return{catatan:0,losses:0,plus,jualEfektif:jual,stokBaru:tambah,stokAkhirEfektif:tambah,isLocked:true,lockType:'plus'};}
+  const catatan=selisih+tambah;
+  return{catatan,losses:0,plus:0,jualEfektif:jual,stokBaru:0,stokAkhirEfektif:catatan,isLocked:false,lockType:'normal'};
+}
+
+// ─── PAGE ROUTER ─────────────────────────────────────────────
+function showPage(name){
+  currentPage=name;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const navMap={input:0,stok:1,laba:2,selisih:3,histori:5,harga:6,database:8};
+  const allNav=document.querySelectorAll('.nav-item');
+  if(allNav[navMap[name]])allNav[navMap[name]].classList.add('active');
+  const main=e('main-content');
+  if(!main)return;
+  if(name==='input')renderInputPage(main);
+  else if(name==='stok')renderStokPage(main);
+  else if(name==='laba')renderLabaPage(main);
+  else if(name==='selisih')renderSelisihPage(main);
+  else if(name==='histori')renderHistoriPage(main);
+  else if(name==='harga')renderHargaPage(main);
+  else if(name==='database')renderDBPage(main);
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: INPUT DATA
+// ════════════════════════════════════════════════════════════
+function renderInputPage(main){
+  main.innerHTML=`
+  <div class="page-header">
+    <div class="page-title">Input Data Harian</div>
+    <div class="page-sub">Catat penjualan, stok, dan penambahan BBM per shift</div>
+  </div>
+  <div class="formula-box">
+    <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--red);font-weight:700">▲ Losses</span><span class="feq">Awal − Jual</span></div>
+    <span style="color:var(--border2)">|</span>
+    <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--purple);font-weight:700">↑ Plus</span><span class="feq">Jual − Awal</span></div>
+    <span style="color:var(--border2)">|</span>
+    <span style="font-size:11px;color:var(--text2)">Penambahan mid-shift langsung masuk stok berjalan</span>
+  </div>
+  <div class="card">
+    <div class="card-title">Informasi Hari</div>
+    <div class="form-row cols-2">
+      <div class="fg"><label>Tanggal</label><input type="date" class="inp" id="f-tanggal" onchange="onTgl()"></div>
+      <div class="fg"><label>Hari</label><input type="text" class="inp" id="f-hari" readonly></div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Pilih Shift</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      ${SO.map(sh=>`
+      <div onclick="tgSh('${sh}')" style="border:2px solid ${state.sel[sh]?'var(--'+{pagi:'green',siang:'amber',malam:'purple'}[sh]+')':'var(--border)'};background:${state.sel[sh]?'var(--'+{pagi:'green',siang:'amber',malam:'purple'}[sh]+'-bg)':'var(--surface)'};border-radius:var(--radius);padding:14px;cursor:pointer;user-select:none;position:relative;transition:all .15s" id="sc-${sh}">
+        <div style="position:absolute;top:8px;right:8px;width:16px;height:16px;border-radius:50%;background:${state.sel[sh]?'var(--'+{pagi:'green',siang:'amber',malam:'purple'}[sh]+')':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:${state.sel[sh]?'#fff':'transparent'}">✓</div>
+        <div style="font-size:16px;margin-bottom:4px">${{pagi:'☀',siang:'⛅',malam:'☾'}[sh]}</div>
+        <div style="font-size:13px;font-weight:700">${SI[sh].label}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:2px">${SI[sh].time}</div>
+      </div>`).join('')}
+    </div>
+  </div>
+  <div id="form-shifts"></div>
+  <div id="form-biaya" class="card" style="display:none">
+    <div class="card-title">Biaya Operasional Harian</div>
+    <div class="biaya-add">
+      <div class="fg fg-ket"><label>Keterangan</label><input type="text" class="inp" id="b-ket" placeholder="cth: Gaji kasir shift pagi"></div>
+      <div class="fg fg-cat"><label>Kategori</label><select class="inp" id="b-cat">${Object.entries(CATS).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}</select></div>
+      <div class="fg fg-nom"><label>Nominal (Rp)</label><input type="text" class="inp inp-num" id="b-nom" placeholder="0" oninput="fmtB(this)"></div>
+      <button class="btn btn-primary btn-sm" onclick="addBiaya()" style="align-self:flex-end">+ Tambah</button>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>#</th><th>Keterangan</th><th>Kategori</th><th>Nominal</th><th></th></tr></thead>
+      <tbody id="biaya-tbody"></tbody>
+    </table></div>
+    <div id="biaya-cat-rows" style="margin-top:8px"></div>
+    <div class="rrow tot"><span>Total Biaya Operasional</span><span class="rv" id="biaya-total" style="font-size:16px">Rp 0</span></div>
+  </div>
+  <div id="form-preview" style="display:none"></div>
+  <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+    <button class="btn btn-reset" onclick="confirmResetAll()">↺ Reset Semua</button>
+    <button class="btn btn-ghost" onclick="showPreview()">Pratinjau</button>
+    <button class="btn btn-save" onclick="showPreview(true)">Pratinjau & Simpan</button>
+  </div>`;
+
+  // Set today
+  const today=new Date();
+  const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');
+  if(e('f-tanggal')&&!e('f-tanggal').value)e('f-tanggal').value=`${y}-${m}-${d}`;
+  onTgl();
+  renderShifts();
+  renderBiaya();
+}
+
+function tgSh(sh){
+  if(state.shiftSaved[sh]){toast('Shift '+cap(sh)+' sudah disimpan. Klik Edit untuk mengubah.');return;}
+  state.sel[sh]=!state.sel[sh];
+  const card=e('sc-'+sh);
+  if(card)renderInputPage(e('main-content'));
+  else renderShifts();
+}
+
+function renderShifts(){
+  const active=SO.filter(s=>state.sel[s]);
+  const wrap=e('form-shifts');if(!wrap)return;
+  wrap.innerHTML=active.map((sh,idx)=>{
+    const prev=idx>0?active[idx-1]:null;
+    const isPagi=sh==='pagi';
+    const si=SI[sh];
+    const def=DEF[sh];
+    const saved=state.shiftSaved[sh];
+    const stateBtn=saved
+      ?`<span class="state-badge sb-saved">✓ Tersimpan</span><button class="btn btn-edit btn-sm" onclick="editShift('${sh}')">✎ Edit</button><button class="btn btn-reset btn-sm" onclick="confirmResetShift('${sh}')">↺ Reset</button>`
+      :`<span class="state-badge sb-edit">✎ Mengedit</span><button class="btn btn-save btn-sm" onclick="saveShift('${sh}')">✓ Simpan Shift</button><button class="btn btn-reset btn-sm" onclick="confirmResetShift('${sh}')">↺ Reset</button>`;
+    const rows=BBM.map(b=>{
+      const d=def[b]||{};
+      const tgl=e('f-tanggal')?.value||'';
+      const tgl1=isTanggal1(tgl);
+      // Shift Pagi: jika bukan tgl 1, cek histori hari sebelumnya
+      const prevDayVal=isPagi&&!tgl1?getPrevDayStock(tgl,b):null;
+      const isAwalAuto=isPagi&&!tgl1&&prevDayVal!==null;
+      const awalVal=isAwalAuto?prevDayVal:(!isPagi&&prev?0:(d.awal||0));
+      const isAuto=(!isPagi&&prev)||isAwalAuto;
+      const lock=saved;
+      const awalStyle=isAwalAuto?'inp inp-num inp-auto':(isAuto&&!isAwalAuto?'inp inp-num inp-auto':(lock?'inp inp-num':'inp inp-num'));
+      const jualStyle=lock?'inp inp-num':'inp inp-num';
+      return`<tr id="tr-${sh}-${b}">
+        <td><span class="tag ${BT[b]}">${BL[b]}</span></td>
+        <td><input type="text" id="${sh}-awal-${b}" value="${awalVal}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px"></td>
+        <td><input type="text" id="${sh}-jual-${b}" value="${d.jual||0}" class="${jualStyle}" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px"></td>
+        <td id="${sh}-catatan-cell-${b}">—</td>
+        <td id="${sh}-sel-cell-${b}" style="font-size:11px;min-width:120px">—</td>
+        <td style="text-align:center">
+          <label style="display:flex;align-items:center;justify-content:center;gap:4px;cursor:pointer;font-size:12px${lock?';opacity:.5;pointer-events:none':''}">
+            <input type="checkbox" id="${sh}-habis-${b}" ${lock?'disabled':''} onchange="onHabis('${sh}','${b}')" style="width:14px;height:14px;accent-color:var(--red)">
+            <span style="color:var(--red);font-weight:600;font-size:11px">Habis</span>
+          </label>
+        </td>
+        <td id="${sh}-status-${b}" style="font-size:11px;text-align:right"></td>
+      </tr>`;
+    }).join('');
+    const tambahGrid=BBM.map(b=>{
+      const tv=isPagi?(def[b]?.tambah||0):0;
+      return`<div class="fg">
+        <label><span class="tag ${BT[b]}" style="font-size:10px">${BL[b]}</span></label>
+        <input type="text" id="${sh}-tambah-${b}" value="${tv}" class="inp inp-tambah inp-num" ${saved?'readonly':''} oninput="onTambahChange('${sh}','${b}')" style="${saved?'opacity:.6':''}">
+        <div id="${sh}-stk-cur-${b}" class="cur-stk"></div>
+      </div>`;
+    }).join('');
+    const tglVal=e('f-tanggal')?.value||'';
+    const tgl1=isTanggal1(tglVal);
+    let autoNote='';
+    if(prev){
+      autoNote=`<div class="nt nt-i" style="margin-bottom:12px;font-size:12px">ℹ Stok awal otomatis dari stok akhir efektif ${cap(prev)}.</div>`;
+    } else if(isPagi&&!tgl1){
+      // Cek apakah ada data kemarin
+      const adaKemarin=BBM.some(b=>getPrevDayStock(tglVal,b)!==null);
+      if(adaKemarin){
+        autoNote=`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">✓ Stok awal otomatis dari stok akhir efektif hari sebelumnya.</div>`;
+      } else {
+        autoNote=`<div class="nt nt-w" style="margin-bottom:12px;font-size:12px">⚠ Tidak ada data hari sebelumnya. Isi stok awal secara manual.</div>`;
+      }
+    } else if(isPagi&&tgl1){
+      autoNote=`<div class="nt nt-i" style="margin-bottom:12px;font-size:12px">📅 Tanggal 1 bulan — isi stok awal secara manual sebagai stok pembuka bulan.</div>`;
+    }
+    return`<div class="shift-block">
+      <div class="shift-hdr ${si.hdr}">
+        <div class="shift-name"><span class="shift-dot ${si.dot}"></span>${si.label} <span class="shift-time">${si.time}</span></div>
+        <div class="shift-actions">${stateBtn}</div>
+      </div>
+      <div class="shift-content">
+        ${autoNote}
+        <div class="tbl-wrap"><table class="stbl">
+          <thead><tr>
+            <th style="text-align:left;min-width:80px">BBM</th>
+            <th>${prev?'Dari '+cap(prev):(isPagi&&!tgl1&&BBM.some(b=>getPrevDayStock(tglVal,b)!==null)?'Dari Kemarin':'Stok Awal')}</th>
+            <th>Penjualan (ltr)</th>
+            <th>Stok Catatan Akhir</th>
+            <th>Losses / Plus</th>
+            <th style="text-align:center">Tangki Habis?</th>
+            <th>Status</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table></div>
+        <div class="tambah-sec">
+          <div class="tambah-title">+ Penambahan Stok Berjalan <span class="mid-badge">MID-SHIFT</span><span style="font-size:10px;color:var(--text3);font-weight:400">— langsung masuk stok shift ini</span></div>
+          <div class="form-row cols-4">${tambahGrid}</div>
+        </div>
+        <div id="notice-${sh}" style="margin-top:12px"></div>
+      </div>
+    </div>
+    ${idx<active.length-1?`<div class="flow-arrow">↓ Stok akhir efektif ${cap(sh)} → Stok awal ${cap(active[idx+1])}</div>`:''}`;
+  }).join('');
+  if(e('form-biaya'))e('form-biaya').style.display=active.length>0?'block':'none';
+  setTimeout(()=>calcAll(),20);
+}
+
+function saveShift(sh){state.shiftSaved[sh]=true;dbSave();toast('Shift '+cap(sh)+' tersimpan dan dikunci ✓');renderShifts();}
+function editShift(sh){state.shiftSaved[sh]=false;dbSave();toast('Shift '+cap(sh)+' dibuka untuk diedit.');renderShifts();}
+
+function confirmResetShift(sh){
+  if(confirm('Reset data shift '+cap(sh)+'? Semua nilai akan menjadi 0.')){
+    state.shiftSaved[sh]=false;
+    BBM.forEach(b=>{
+      const aEl=e(`${sh}-awal-${b}`);if(aEl&&!aEl.readOnly)aEl.value=0;
+      const jEl=e(`${sh}-jual-${b}`);if(jEl)jEl.value=0;
+      const tEl=e(`${sh}-tambah-${b}`);if(tEl)tEl.value=0;
+      const hEl=e(`${sh}-habis-${b}`);if(hEl)hEl.checked=false;
+    });
+    renderShifts();calcAll();toast('Shift '+cap(sh)+' direset ke 0.');
+  }
+}
+
+function confirmResetAll(){
+  if(confirm('Reset semua data? Semua shift akan kembali ke 0.')){
+    SO.forEach(sh=>{state.shiftSaved[sh]=false;});
+    state.sel={pagi:true,siang:false,malam:false};
+    state.biayaItems=[];
+    state.biayaId=1;
+    state.biayaId=1;
+    dbSave();
+    showPage('input');
+    toast('Semua data direset.');
+  }
+}
+
+// ─── COMPUTE ────────────────────────────────────────────────
+function calcShift(sh){
+  const notices=[];
+  BBM.forEach(b=>{
+    const awal=gv(`${sh}-awal-${b}`);
+    const habis=gck(`${sh}-habis-${b}`);
+    const jual=gv(`${sh}-jual-${b}`);
+    const tambah=gv(`${sh}-tambah-${b}`);
+    const r=calcRow(awal,jual,tambah,habis);
+    const jEl=e(`${sh}-jual-${b}`);
+    if(jEl&&!state.shiftSaved[sh]){if(habis){jEl.value=0;jEl.readOnly=true;jEl.className='inp inp-num';jEl.style.background='var(--surface2)';jEl.style.color='var(--text3)';}else{jEl.readOnly=false;jEl.style.background='';jEl.style.color='';}}
+    const cc=e(`${sh}-catatan-cell-${b}`);
+    if(cc){if(r.isLocked){const cls=r.lockType==='losses'?'pill pill-zero-l':'pill pill-zero-p';cc.innerHTML=`<span class="${cls}">0 🔒</span>`;}else if(r.catatan<=BATAS[b]&&r.catatan>0){cc.innerHTML=`<span class="pill pill-rendah">${fN(r.catatan)}</span>`;}else{cc.innerHTML=`<span class="pill pill-ok">${fN(r.catatan)}</span>`;}}
+    const sc2=e(`${sh}-sel-cell-${b}`);
+    if(sc2){if(r.isLocked&&r.lockType==='losses'){sc2.innerHTML=`<span class="losses-val">▲ ${fN(r.losses)} ltr 🔒<br><small>${fN(awal)}−${fN(jual)}=${fN(r.losses)}</small></span>`;}else if(r.isLocked&&r.lockType==='plus'){sc2.innerHTML=`<span class="plus-val">↑ +${fN(r.plus)} ltr 🔒<br><small>${fN(jual)}−${fN(awal)}=${fN(r.plus)}</small></span>`;}else{sc2.innerHTML='<span style="color:var(--text3);font-size:12px">— Normal</span>';}}
+    const ns=e(`${sh}-stk-cur-${b}`);
+    if(ns){if(tambah>0){ns.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;}else{ns.textContent='';}}
+    const tr=e(`tr-${sh}-${b}`);
+    if(tr)tr.className=r.isLocked&&r.lockType==='losses'?'row-losses':r.isLocked&&r.lockType==='plus'?'row-plus':state.shiftSaved[sh]?'row-saved':'';
+    const st2=e(`${sh}-status-${b}`);
+    if(st2){if(r.isLocked&&r.lockType==='losses'){let s=`<span class="bx bl">Losses 🔒</span>`;if(tambah>0)s+=` <span class="bx bn">+${fN(tambah)} baru</span>`;st2.innerHTML=s;}else if(r.isLocked&&r.lockType==='plus'){let s=`<span class="bx bp">Plus 🔒</span>`;if(tambah>0)s+=` <span class="bx bn">+${fN(tambah)} baru</span>`;st2.innerHTML=s;}else if(r.catatan<=BATAS[b]&&r.catatan>0){st2.innerHTML='<span class="bx bw">Rendah</span>';}else{st2.innerHTML='<span class="bx bk">OK</span>';}}
+    if(r.isLocked&&r.lockType==='losses'){let msg=`▲ <strong>${BL[b]}</strong>: Losses = ${fN(awal)}−${fN(jual)} = <strong>${fN(r.losses)} ltr</strong> 🔒 — kerugian ${fRF(r.losses*gHJ(b))}.`;if(tambah>0)msg+=` Penambahan ${fN(tambah)} ltr = stok baru.`;notices.push(`<div class="nt nt-d">${msg}</div>`);}
+    if(r.isLocked&&r.lockType==='plus'){let msg=`↑ <strong>${BL[b]}</strong>: Plus = ${fN(jual)}−${fN(awal)} = <strong>${fN(r.plus)} ltr</strong> 🔒 — keuntungan +${fRF(r.plus*gHJ(b))}.`;if(tambah>0)msg+=` Penambahan ${fN(tambah)} ltr = stok baru.`;notices.push(`<div class="nt nt-p">${msg}</div>`);}
+    if(!r.isLocked&&r.catatan>0&&r.catatan<=BATAS[b])notices.push(`<div class="nt nt-w">⚠ <strong>${BL[b]}</strong>: Stok menipis sisa ${fN(r.catatan)} ltr.</div>`);
+    if(tambah>0&&!r.isLocked)notices.push(`<div class="nt nt-s">+ <strong>${BL[b]}</strong>: Penambahan ${fN(tambah)} ltr berjalan — stok akhir ${fN(r.stokAkhirEfektif)} ltr.</div>`);
+  });
+  const nb=e(`notice-${sh}`);if(nb)nb.innerHTML=notices.join('');
+}
+
+function propagate(fromSh,toSh){
+  BBM.forEach(b=>{
+    const awal=gv(`${fromSh}-awal-${b}`);const habis=gck(`${fromSh}-habis-${b}`);
+    const jual=gv(`${fromSh}-jual-${b}`);const tambah=gv(`${fromSh}-tambah-${b}`);
+    const r=calcRow(awal,jual,tambah,habis);
+    const toEl=e(`${toSh}-awal-${b}`);
+    if(toEl&&toEl.readOnly&&!state.shiftSaved[toSh])toEl.value=Math.max(0,r.stokAkhirEfektif);
+  });calcShift(toSh);
+}
+
+function calcAll(){
+  const active=SO.filter(s=>state.sel[s]);
+  active.forEach((sh,idx)=>{calcShift(sh);if(idx<active.length-1)propagate(sh,active[idx+1]);});
+  updatePreviewIfOpen();
+}
+
+function onFC(sh,b){
+  calcShift(sh);
+  const active=SO.filter(s=>state.sel[s]);const idx=active.indexOf(sh);
+  for(let i=idx+1;i<active.length;i++)propagate(active[i-1],active[i]);
+  updatePreviewIfOpen();
+}
+function onHabis(sh,b){onFC(sh,b);}
+function onTambahChange(sh,b){
+  const awal=gv(`${sh}-awal-${b}`);const jual=gv(`${sh}-jual-${b}`);const tambah=gv(`${sh}-tambah-${b}`);const habis=gck(`${sh}-habis-${b}`);
+  const r=calcRow(awal,jual,tambah,habis);
+  const el2=e(`${sh}-stk-cur-${b}`);if(el2){if(tambah>0){el2.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;}else{el2.textContent='';}}
+  onFC(sh,b);
+}
+
+// ─── AKUMULASI ───────────────────────────────────────────────
+function getAkum(){
+  const active=SO.filter(s=>state.sel[s]);const out={};
+  BBM.forEach(b=>{
+    const awal=gv(`${active[0]}-awal-${b}`)||0;
+    let tJual=0,tTambah=0,tLosses=0,tPlus=0,stokAkhir=0;
+    active.forEach(sh=>{
+      const a=gv(`${sh}-awal-${b}`)||0;const habis=gck(`${sh}-habis-${b}`);
+      const jual=gv(`${sh}-jual-${b}`)||0;const tambah=gv(`${sh}-tambah-${b}`)||0;
+      const r=calcRow(a,jual,tambah,habis);
+      tJual+=r.jualEfektif;tTambah+=tambah;tLosses+=r.losses;tPlus+=r.plus;stokAkhir=r.stokAkhirEfektif;
+    });
+    out[b]={awal,tJual,tTambah,tLosses,tPlus,stokAkhir};
+  });
+  return{active,out};
+}
+
+// ─── PREVIEW ────────────────────────────────────────────────
+let previewOpen=false;
+function updatePreviewIfOpen(){if(previewOpen)showPreview(false,true);}
+function showPreview(autoSave=false,update=false){
+  previewOpen=true;
+  const active=SO.filter(s=>state.sel[s]);
+  if(!active.length){toast('Pilih minimal 1 shift!');return;}
+  const{out}=getAkum();
+  let tA=0,tJ=0,tT=0,tK=0,tL=0,tP=0,tO=0,tM=0,tLRp=0,tPRp=0;
+  const notices=[];
+  const rows=BBM.map(b=>{
+    const d=out[b];const vol=d.tJual+d.tPlus;
+    const omzet=vol*gHJ(b),margin=vol*(gHJ(b)-gHPP(b));
+    const lRp=d.tLosses*gHJ(b),pRp=d.tPlus*gHJ(b);
+    tA+=d.awal;tJ+=d.tJual;tT+=d.tTambah;tK+=d.stokAkhir;tL+=d.tLosses;tP+=d.tPlus;tO+=omzet;tM+=margin;tLRp+=lRp;tPRp+=pRp;
+    const shHtml=d.tLosses>0&&d.tPlus>0?'<span class="bx bl">L🔒</span><span class="bx bp">P🔒</span>':d.tLosses>0?'<span class="bx bl">Losses 🔒</span>':d.tPlus>0?`<span class="bx bp">+${fN(d.tPlus)} 🔒</span>`:'<span class="bx bk">Normal</span>';
+    if(d.tLosses>0)notices.push(`<div class="nt nt-d">▲ <strong>${BL[b]}</strong>: Losses ${fN(d.tLosses)} ltr = ${fRF(lRp)} 🔒</div>`);
+    if(d.tPlus>0)notices.push(`<div class="nt nt-p">↑ <strong>${BL[b]}</strong>: Plus ${fN(d.tPlus)} ltr = +${fRF(pRp)} 🔒</div>`);
+    return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td>${fN(d.awal)}</td><td>${fN(d.tJual)}</td><td style="color:var(--green)">+${fN(d.tTambah)}</td><td style="font-weight:700">${fN(d.stokAkhir)}</td><td>${shHtml}</td><td style="color:var(--red)">${d.tLosses>0?'-'+fN(d.tLosses)+' 🔒':'—'}</td><td style="color:var(--purple)">${d.tPlus>0?'+'+fN(d.tPlus)+' 🔒':'—'}</td><td>${fR(omzet)}</td></tr>`;
+  });
+  const ops=getTotalBiaya();const bersih=tM-ops-tLRp+tPRp;
+  const pv=e('form-preview');
+  if(!pv)return;
+  pv.style.display='block';
+  pv.innerHTML=`<div class="preview-section">
+    <div class="preview-title">📊 Pratinjau Ringkasan</div>
+    ${notices.join('')}
+    <div class="tbl-wrap"><table style="margin-bottom:14px"><thead><tr><th style="text-align:left">BBM</th><th>Stok Awal</th><th>Jual</th><th>Tambah</th><th>Stok Akhir</th><th>Status</th><th style="color:var(--red)">Losses 🔒</th><th style="color:var(--purple)">Plus 🔒</th><th>Omzet</th></tr></thead><tbody>${rows.join('')}</tbody><tfoot><tr><td>Total</td><td>${fN(tA)}</td><td>${fN(tJ)}</td><td>+${fN(tT)}</td><td>${fN(tK)}</td><td>—</td><td>${tL>0?'-'+fN(tL)+' ltr':'—'}</td><td>${tP>0?'+'+fN(tP)+' ltr':'—'}</td><td>${fR(tO)}</td></tr></tfoot></table></div>
+    <div class="sep"></div>
+    <div class="rrow"><span class="rl">Omzet Kotor</span><span class="rv">${fRF(tO)}</span></div>
+    <div class="rrow"><span class="rl">Laba Kotor</span><span class="rv" style="color:${tM>=0?'var(--green)':'var(--red)'}">${fRF(tM)}</span></div>
+    <div class="rrow"><span class="rl">Total Biaya Operasional</span><span class="rv" style="color:var(--red)">-${fRF(ops)}</span></div>
+    <div class="rrow"><span class="rl" style="color:var(--red)">▲ Kerugian Losses</span><span class="rv" style="color:var(--red)">${tLRp>0?'-'+fRF(tLRp):'-Rp 0'}</span></div>
+    <div class="rrow"><span class="rl" style="color:var(--purple)">↑ Keuntungan Plus</span><span class="rv" style="color:var(--purple)">${tPRp>0?'+'+fRF(tPRp):'+Rp 0'}</span></div>
+    <div class="rrow tot"><span>Laba Bersih</span><span class="rv" style="color:${bersih>=0?'var(--green)':'var(--red)'}";font-size:16px">${fRF(bersih)}</span></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
+      <button class="btn btn-ghost" onclick="previewOpen=false;e('form-preview').style.display='none'">Tutup</button>
+      <button class="btn btn-save btn-lg" onclick="saveData()">💾 Simpan Data Hari Ini</button>
+    </div>
+  </div>`;
+  if(!update)setTimeout(()=>pv.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
+  if(autoSave)saveData();
+}
+
+// ─── BIAYA ──────────────────────────────────────────────────
+function fmtB(el){const raw=el.value.replace(/\./g,'').replace(/\D/g,'');if(!raw){el.value='';return;}el.value=parseInt(raw).toLocaleString('id');}
+function getTotalBiaya(){return state.biayaItems.reduce((s,i)=>s+i.nom,0);}
+function addBiaya(){
+  const ket=e('b-ket').value.trim();const cat=e('b-cat').value;const nom=parseInt((e('b-nom').value||'').replace(/\./g,''))||0;
+  if(!ket){toast('Keterangan tidak boleh kosong!');return;}if(nom<=0){toast('Nominal harus lebih dari 0!');return;}
+  state.biayaItems.push({id:state.biayaId++,ket,cat,nom});
+  e('b-ket').value='';e('b-nom').value='';e('b-cat').value='gaji';
+  renderBiaya();dbSave();
+}
+function delBiaya(id){state.biayaItems=state.biayaItems.filter(i=>i.id!==id);renderBiaya();dbSave();}
+function renderBiaya(){
+  const tbody=e('biaya-tbody');if(!tbody)return;
+  if(!state.biayaItems.length){tbody.innerHTML='<tr><td colspan="5" class="empty-state">Belum ada item. Tambahkan di atas.</td></tr>';st('biaya-total','Rp 0');const cr=e('biaya-cat-rows');if(cr)cr.innerHTML='';return;}
+  tbody.innerHTML=state.biayaItems.map((item,idx)=>{const c=CATS[item.cat]||CATS.lainnya;return`<tr><td style="color:var(--text3)">${idx+1}</td><td>${esc(item.ket)}</td><td><span class="cat-badge" style="background:${c.bg};color:${c.color}">${c.label}</span></td><td>Rp ${fN(item.nom)}</td><td><button class="btn btn-del btn-sm" onclick="delBiaya(${item.id})"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 2h4M2 4h12M5 4v8a1 1 0 001 1h4a1 1 0 001-1V4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 7v4M9 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button></td></tr>`;}).join('');
+  st('biaya-total','Rp '+fN(getTotalBiaya()));
+  const catTotals={};state.biayaItems.forEach(i=>catTotals[i.cat]=(catTotals[i.cat]||0)+i.nom);
+  const cr=e('biaya-cat-rows');if(cr)cr.innerHTML=Object.entries(catTotals).map(([cat,sum])=>{const c=CATS[cat]||CATS.lainnya;return`<div class="rrow"><span class="rl"><span class="cat-badge" style="background:${c.bg};color:${c.color}">${c.label}</span></span><span class="rv">Rp ${fN(sum)}</span></div>`;}).join('');
+}
+
+// ─── SAVE ───────────────────────────────────────────────────
+function saveData(){
+  const tanggal=e('f-tanggal')?.value||'';
+  if(!tanggal){toast('Tanggal harus diisi!');return;}
+  const active=SO.filter(s=>state.sel[s]);if(!active.length){toast('Pilih minimal 1 shift!');return;}
+  const shiftData={};
+  active.forEach(sh=>{shiftData[sh]={};BBM.forEach(b=>{
+    const awal=gv(`${sh}-awal-${b}`)||0;const habis=gck(`${sh}-habis-${b}`);
+    const jual=gv(`${sh}-jual-${b}`)||0;const tambah=gv(`${sh}-tambah-${b}`)||0;
+    const r=calcRow(awal,jual,tambah,habis);
+    shiftData[sh][b]={awal,jual:r.jualEfektif,tambah,habis,catatan:r.catatan,losses:r.losses,plus:r.plus,stokBaru:r.stokBaru,stokAkhirEfektif:r.stokAkhirEfektif,isLocked:r.isLocked,lockType:r.lockType};
+  });});
+  const{out}=getAkum();
+  let tJual=0,tOmzet=0,tMargin=0,tLRp=0,tPRp=0;
+  const hargaAktif=getHargaPadaTanggal(tanggal,'_snap_')||{};
+  BBM.forEach(b=>{const d=out[b];const vol=d.tJual+d.tPlus;const {hj,hpp}=getHargaPadaTanggal(tanggal,b);tJual+=vol;tOmzet+=vol*hj;tMargin+=vol*(hj-hpp);tLRp+=d.tLosses*hj;tPRp+=d.tPlus*hj;});
+  const ops=getTotalBiaya();
+  const hargaSnapshot={...state.harga};
+  const rec={tanggal,hari:e('f-hari')?.value||'',shifts:active,shiftData,biayaItems:[...state.biayaItems],ops,totalJual:tJual,totalOmzet:tOmzet,totalMargin:tMargin,tLRp,tPRp,labaBersih:tMargin-ops-tLRp+tPRp,hargaSnapshot,savedAt:new Date().toISOString()};
+  const idx=state.savedData.findIndex(d=>d.tanggal===tanggal);
+  if(idx>=0)state.savedData[idx]=rec;else state.savedData.unshift(rec);
+  state.savedData=state.savedData.slice(0,365);
+  dbSave();
+  toast('✓ Data '+tanggal+' tersimpan!');
+  previewOpen=false;
+  showPage('stok');
+  // Auto cloud sync jika URL sudah diatur
+  if(getCloudUrl()){
+    cloudSave(rec).then(r=>{
+      if(r.ok)toast('☁ Tersinkron ke cloud: '+tanggal);
+      else toast('⚠ Simpan lokal OK, cloud gagal: '+r.msg);
+    });
+  }
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: STOK BBM
+// ════════════════════════════════════════════════════════════
+function renderStokPage(main){
+  const fd=state.savedData[0];
+  if(!fd){main.innerHTML=`<div class="page-header"><div class="page-title">Stok BBM</div></div><div class="card"><div class="empty-state">Belum ada data tersimpan. Input data melalui halaman Input Data.</div></div>`;return;}
+  const ac=fd.shifts;let tA=0,tJ=0,tT=0,tK=0,tL=0,tP=0,tLRp=0,tPRp=0;
+  BBM.forEach(b=>{tA+=(fd.shiftData[ac[0]]?.[b]?.awal||0);ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};tJ+=d.jual||0;tT+=d.tambah||0;tL+=d.losses||0;tP+=d.plus||0;tLRp+=(d.losses||0)*gHJ(b);tPRp+=(d.plus||0)*gHJ(b);});tK+=(fd.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0);});
+  const shiftNavBtns=ac.map((sh,i)=>`<button class="snavbtn${i===0?' active':''}" onclick="switchSV(this,'sv-${sh}')">${cap(sh)}</button>`).join('');
+  const shiftViews=ac.map((sh,i)=>{
+    const rows=BBM.map(b=>{const d=fd.shiftData[sh]?.[b]||{};const l=d.losses||0,p=d.plus||0,sb=d.stokBaru||0,sae=d.stokAkhirEfektif||0;const cHtml=d.isLocked?`<span class="pill ${d.lockType==='losses'?'pill-zero-l':'pill-zero-p'}">0 🔒</span>`:`<span class="pill pill-ok">${fN(d.catatan||0)}</span>`;const saeHtml=d.isLocked&&sb>0?`<span class="pill pill-new">${fN(sae)} baru</span>`:d.isLocked?`<span style="color:var(--text3)">0</span>`:`<span class="pill pill-ok">${fN(sae)}</span>`;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td>${fN(d.awal||0)}</td><td>${fN(d.jual||0)}</td><td style="color:var(--green)">+${fN(d.tambah||0)}${d.tambah>0?'<br><small style="font-size:10px;color:var(--text3)">mid-shift</small>':''}</td><td>${cHtml}</td><td>${saeHtml}</td><td style="color:var(--red)">${l>0?'-'+fN(l)+' 🔒':'—'}</td><td style="color:var(--purple)">${p>0?'+'+fN(p)+' 🔒':'—'}</td></tr>`;}).join('');
+    return`<div id="sv-${sh}" style="display:${i===0?'block':'none'}"><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>${i===0?'Stok Awal':'Dari '+cap(ac[i-1])}</th><th>Jual</th><th>Tambah</th><th>Stok Catatan</th><th>Stok Akhir Efektif</th><th style="color:var(--red)">Losses 🔒</th><th style="color:var(--purple)">Plus 🔒</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }).join('');
+  let rA=0,rT=0,rJ=0,rK=0,rL=0,rP=0,rO=0;
+  const rrows=BBM.map(b=>{const awal=fd.shiftData[ac[0]]?.[b]?.awal||0;let t=0,j=0,l=0,p=0;ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};t+=d.tambah||0;j+=d.jual||0;l+=d.losses||0;p+=d.plus||0;});const k=fd.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0;const o=(j+p)*gHJ(b);rA+=awal;rT+=t;rJ+=j;rK+=k;rL+=l;rP+=p;rO+=o;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td>${fN(awal)}</td><td style="color:var(--green)">+${fN(t)}</td><td>${fN(j)}</td><td style="font-weight:700">${fN(k)}</td><td style="color:var(--red)">${l>0?'-'+fN(l)+' 🔒':'—'}</td><td style="color:var(--purple)">${p>0?'+'+fN(p)+' 🔒':'—'}</td><td>${fR(o)}</td></tr>`;}).join('');
+  main.innerHTML=`<div class="page-header"><div class="page-title">Stok BBM</div><div class="page-sub">Data terakhir: ${fd.tanggal} (${fd.hari})</div></div>
+  <div class="g4">
+    <div class="metric"><div class="metric-label">Stok Awal</div><div class="metric-value c-blue">${fN(tA)}</div><div class="metric-sub">liter catatan</div></div>
+    <div class="metric"><div class="metric-label">Total Penjualan</div><div class="metric-value">${fN(tJ)}</div><div class="metric-sub">liter terjual</div></div>
+    <div class="metric"><div class="metric-label">Penambahan</div><div class="metric-value c-green">+${fN(tT)}</div><div class="metric-sub">liter masuk</div></div>
+    <div class="metric"><div class="metric-label">Stok Akhir Efektif</div><div class="metric-value">${fN(tK)}</div><div class="metric-sub">liter tersisa</div></div>
+  </div>
+  <div class="g4" style="margin-top:-8px">
+    <div class="metric"><div class="metric-label">Losses (Awal−Jual)</div><div class="metric-value c-red">${tL>0?'-'+fN(tL)+' ltr':'0'}</div><div class="metric-sub">🔒 terkunci</div></div>
+    <div class="metric"><div class="metric-label">Nilai Losses</div><div class="metric-value c-red">${tLRp>0?'-'+fR(tLRp):'-Rp 0'}</div></div>
+    <div class="metric"><div class="metric-label">Plus (Jual−Awal)</div><div class="metric-value c-purple">${tP>0?'+'+fN(tP)+' ltr':'0'}</div><div class="metric-sub">🔒 terkunci</div></div>
+    <div class="metric"><div class="metric-label">Nilai Plus</div><div class="metric-value c-purple">${tPRp>0?'+'+fR(tPRp):'+Rp 0'}</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Stok Per Shift<div class="snav" style="margin:0">${shiftNavBtns}</div></div>
+    ${shiftViews}
+  </div>
+  <div class="card">
+    <div class="card-title">Ringkasan Per BBM</div>
+    <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>Stok Awal</th><th>Tambah</th><th>Jual</th><th>Stok Akhir</th><th style="color:var(--red)">Losses 🔒</th><th style="color:var(--purple)">Plus 🔒</th><th>Omzet</th></tr></thead><tbody>${rrows}</tbody><tfoot><tr><td>Total</td><td>${fN(rA)}</td><td>+${fN(rT)}</td><td>${fN(rJ)}</td><td>${fN(rK)}</td><td>${rL>0?'-'+fN(rL):'—'}</td><td>${rP>0?'+'+fN(rP):'—'}</td><td>${fR(rO)}</td></tr></tfoot></table></div>
+  </div>`;
+}
+
+function switchSV(btn,targetId){
+  const parent=btn.closest('.card');if(!parent)return;
+  parent.querySelectorAll('.snavbtn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  parent.querySelectorAll('[id^="sv-"]').forEach(el=>el.style.display='none');
+  const v=e(targetId);if(v)v.style.display='block';
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: KEUNTUNGAN
+// ════════════════════════════════════════════════════════════
+function renderLabaPage(main){
+  const fd=state.savedData[0];
+  if(!fd){main.innerHTML=`<div class="page-header"><div class="page-title">Keuntungan</div></div><div class="card"><div class="empty-state">Belum ada data tersimpan.</div></div>`;return;}
+  const ac=fd.shifts;let tV=0,tO=0,tL=0;
+  // Gunakan hargaSnapshot jika ada (harga yang berlaku saat data disimpan)
+  const hSnap=fd.hargaSnapshot||null;
+  const getHJ=b=>hSnap?(hSnap[b]||gHJ(b)):getHargaPadaTanggal(fd.tanggal,b).hj;
+  const getHPP=b=>hSnap?(hSnap['hpp_'+b]||gHPP(b)):getHargaPadaTanggal(fd.tanggal,b).hpp;
+  const hargaNote=hSnap?`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">✓ Keuntungan dihitung menggunakan harga yang berlaku pada <strong>${fd.tanggal}</strong> (snapshot tersimpan).</div>`:`<div class="nt nt-w" style="margin-bottom:12px;font-size:12px">⚠ Tidak ada snapshot harga untuk tanggal ini — menggunakan harga aktif saat ini.</div>`;
+  const rows=BBM.map(b=>{let j=0,p=0;ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};j+=d.jual||0;p+=d.plus||0;});const vol=j+p,hj=getHJ(b),hpp=getHPP(b),m=hj-hpp;const o=vol*hj,l=vol*m;tV+=vol;tO+=o;tL+=l;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span>${p>0?` <span class="bx bp">+${fN(p)} 🔒</span>`:''}</td><td>${fN(vol)}</td><td>Rp ${fN(hj)}</td><td>Rp ${fN(hpp)}</td><td>${fR(o)}</td><td style="color:${m>=0?'var(--green)':'var(--red)'};font-weight:600">${m>=0?'+':''}${fRF(m)}</td><td style="color:${l>=0?'var(--green)':'var(--red)'};font-weight:700">${fRF(l)}</td></tr>`;}).join('');
+  const biayaDetail=fd.biayaItems&&fd.biayaItems.length?fd.biayaItems.map(item=>{const c=CATS[item.cat]||CATS.lainnya;return`<div class="rrow"><span class="rl" style="display:flex;align-items:center;gap:8px"><span class="cat-badge" style="background:${c.bg};color:${c.color}">${c.label}</span>${esc(item.ket)}</span><span class="rv">Rp ${fN(item.nom)}</span></div>`;}).join(''):'<div class="empty-state" style="padding:12px">Tidak ada biaya operasional tercatat.</div>';
+  main.innerHTML=`<div class="page-header"><div class="page-title">Keuntungan</div><div class="page-sub">Data terakhir: ${fd.tanggal} (${fd.hari})</div></div>
+  ${hargaNote}
+  <div class="g4">
+    <div class="metric"><div class="metric-label">Total Volume</div><div class="metric-value c-blue">${fN(tV)}</div><div class="metric-sub">liter terjual</div></div>
+    <div class="metric"><div class="metric-label">Omzet Kotor</div><div class="metric-value">${fR(tO)}</div></div>
+    <div class="metric"><div class="metric-label">Laba Kotor</div><div class="metric-value ${tL>=0?'c-green':'c-red'}">${fR(tL)}</div></div>
+    <div class="metric"><div class="metric-label">Laba Bersih</div><div class="metric-value ${fd.labaBersih>=0?'c-green':'c-red'}">${fR(fd.labaBersih)}</div></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Rincian Per BBM <span style="font-size:11px;color:var(--text3);font-weight:400">— harga berlaku ${fd.tanggal}</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>Volume</th><th>Harga Jual</th><th>HPP</th><th>Omzet</th><th>Margin/ltr</th><th>Laba BBM</th></tr></thead><tbody>${rows}</tbody><tfoot><tr><td>Total</td><td>${fN(tV)}</td><td>—</td><td>—</td><td>${fR(tO)}</td><td>—</td><td style="color:${tL>=0?'var(--green)':'var(--red)'}">${fRF(tL)}</td></tr></tfoot></table></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Komponen Laba Bersih</div>
+    <div style="margin-bottom:12px">${biayaDetail}</div>
+    <div class="sep"></div>
+    <div class="rrow"><span class="rl">Laba Kotor (margin)</span><span class="rv" style="color:${tL>=0?'var(--green)':'var(--red)'}">${fRF(tL)}</span></div>
+    <div class="rrow"><span class="rl">Total Biaya Operasional</span><span class="rv" style="color:var(--red)">-${fRF(fd.ops)}</span></div>
+    <div class="rrow"><span class="rl" style="color:var(--red)">Kerugian Losses 🔒</span><span class="rv" style="color:var(--red)">${fd.tLRp>0?'-'+fRF(fd.tLRp):'-Rp 0'}</span></div>
+    <div class="rrow"><span class="rl" style="color:var(--purple)">Keuntungan Plus 🔒</span><span class="rv" style="color:var(--purple)">${fd.tPRp>0?'+'+fRF(fd.tPRp):'+Rp 0'}</span></div>
+    <div class="rrow tot"><span>Laba Bersih</span><span style="font-size:18px;font-weight:800;color:${fd.labaBersih>=0?'var(--green)':'var(--red)'}">${fRF(fd.labaBersih)}</span></div>
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: LOSSES & PLUS
+// ════════════════════════════════════════════════════════════
+function renderSelisihPage(main){
+  const fd=state.savedData[0];
+  if(!fd){main.innerHTML=`<div class="page-header"><div class="page-title">Losses & Plus</div></div><div class="card"><div class="empty-state">Belum ada data tersimpan.</div></div>`;return;}
+  const ac=fd.shifts;let tLL=0,tLRp=0,tPL=0,tPRp=0;
+  BBM.forEach(b=>{ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};tLL+=d.losses||0;tLRp+=(d.losses||0)*gHJ(b);tPL+=d.plus||0;tPRp+=(d.plus||0)*gHJ(b);});});
+  const shiftNavBtns=ac.map((sh,i)=>`<button class="snavbtn${i===0?' active':''}" onclick="switchSV(this,'sev-${sh}')">${cap(sh)}</button>`).join('');
+  const shiftViews=ac.map((sh,i)=>{
+    const rows=BBM.map(b=>{const d=fd.shiftData[sh]?.[b]||{};const l=d.losses||0,p=d.plus||0;const lRp=l*gHJ(b),pRp=p*gHJ(b);const rumusL=l>0?`${fN(d.awal)}−${fN(d.jual)}=${fN(l)}`:'—';const rumusP=p>0?`${fN(d.jual)}−${fN(d.awal)}=${fN(p)}`:'—';const jenis=d.isLocked&&d.lockType==='losses'?'<span class="bx bl">Losses 🔒</span>':d.isLocked&&d.lockType==='plus'?'<span class="bx bp">Plus 🔒</span>':'<span class="bx bk">Normal</span>';return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td>${fN(d.awal||0)}</td><td>${fN(d.jual||0)}</td><td>${fN(d.tambah||0)}</td><td style="font-weight:700">${fN(d.stokAkhirEfektif||0)}</td><td>${jenis}</td><td style="color:var(--red);font-size:11px">${rumusL}</td><td style="color:var(--red);font-weight:700">${l>0?'-'+fN(l)+' 🔒':'—'}</td><td style="color:var(--red)">${l>0?'-'+fRF(lRp):'—'}</td><td style="color:var(--purple);font-size:11px">${rumusP}</td><td style="color:var(--purple);font-weight:700">${p>0?'+'+fN(p)+' 🔒':'—'}</td><td style="color:var(--purple)">${p>0?'+'+fRF(pRp):'—'}</td></tr>`;}).join('');
+    return`<div id="sev-${sh}" style="display:${i===0?'block':'none'}"><div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>Awal</th><th>Jual</th><th>Tambah</th><th>Stok Akhir</th><th>Status</th><th style="color:var(--red)">Rumus Losses</th><th style="color:var(--red)">Losses 🔒</th><th style="color:var(--red)">Nilai</th><th style="color:var(--purple)">Rumus Plus</th><th style="color:var(--purple)">Plus 🔒</th><th style="color:var(--purple)">Nilai</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }).join('');
+  main.innerHTML=`<div class="page-header"><div class="page-title">Losses & Plus</div><div class="page-sub">Selisih stok catatan vs aktual — terkunci setelah dihitung</div></div>
+  <div class="g2">
+    <div style="background:var(--red-bg);border:1px solid var(--red-light);border-radius:var(--radius-lg);padding:20px;border-left:4px solid var(--red)">
+      <div style="font-size:14px;font-weight:700;color:var(--red);margin-bottom:6px">▲ LOSSES 🔒</div>
+      <div style="font-size:11px;color:var(--red);opacity:.8;margin-bottom:10px">Rumus: Stok Awal − Penjualan</div>
+      <div style="font-size:28px;font-weight:800;color:var(--red)">${tLL>0?'-'+fN(tLL)+' ltr':'0 ltr'}</div>
+      <div style="font-size:13px;font-weight:600;color:var(--red);margin-top:6px">${tLL>0?'-'+fRF(tLRp):'-Rp 0'}</div>
+    </div>
+    <div style="background:var(--purple-bg);border:1px solid var(--purple-light);border-radius:var(--radius-lg);padding:20px;border-left:4px solid var(--purple)">
+      <div style="font-size:14px;font-weight:700;color:var(--purple);margin-bottom:6px">↑ PLUS 🔒</div>
+      <div style="font-size:11px;color:var(--purple);opacity:.8;margin-bottom:10px">Rumus: Penjualan − Stok Awal</div>
+      <div style="font-size:28px;font-weight:800;color:var(--purple)">${tPL>0?'+'+fN(tPL)+' ltr':'0 ltr'}</div>
+      <div style="font-size:13px;font-weight:600;color:var(--purple);margin-top:6px">${tPL>0?'+'+fRF(tPRp):'+Rp 0'}</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-title">Detail Per Shift<div class="snav" style="margin:0">${shiftNavBtns}</div></div>
+    ${shiftViews}
+  </div>`;
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: HISTORI
+// ════════════════════════════════════════════════════════════
+function renderHistoriPage(main){
+  if(!state.savedData.length){main.innerHTML=`<div class="page-header"><div class="page-title">Histori</div></div><div class="card"><div class="empty-state">Belum ada data tersimpan.</div></div>`;return;}
+  const rows=state.savedData.map((d,i)=>{const badges=d.shifts.map(s=>`<span class="bx ${s==='pagi'?'bk':s==='siang'?'bw':'bp'}" style="font-size:10px">${cap(s)}</span>`).join('');return`<div class="hist-row"><div>${d.tanggal}</div><div>${badges}</div><div style="text-align:right">${fR(d.totalOmzet)}</div><div style="text-align:right;font-weight:700;color:${d.labaBersih>=0?'var(--green)':'var(--red)'}">${fRF(d.labaBersih)}</div><div style="text-align:center"><button class="btn btn-ghost btn-sm" onclick="loadData(${i})">Muat</button></div></div>`;}).join('');
+  const labs=[...state.savedData].reverse().map(d=>d.tanggal.slice(5));
+  const vals=[...state.savedData].reverse().map(d=>d.labaBersih);
+  main.innerHTML=`<div class="page-header"><div class="page-title">Histori</div><div class="page-sub">${state.savedData.length} data tersimpan</div></div>
+  <div class="card">
+    <div class="card-title">Tren Laba Bersih<div><button class="btn btn-reset btn-sm" onclick="if(confirm('Hapus semua histori?')){state.savedData=[];dbSave();showPage('histori');toast('Histori dihapus.')}">Hapus Semua</button></div></div>
+    <div class="chart-wrap"><canvas id="histChart"></canvas></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Riwayat Data</div>
+    <div class="hist-row" style="padding-bottom:8px">
+      <div class="hist-head">Tanggal</div><div class="hist-head">Shift</div>
+      <div class="hist-head" style="text-align:right">Omzet</div>
+      <div class="hist-head" style="text-align:right">Laba Bersih</div>
+      <div class="hist-head" style="text-align:center">Aksi</div>
+    </div>
+    ${rows}
+  </div>`;
+  const ctx=e('histChart');
+  if(ctx&&window.Chart){
+    if(histChartInst)histChartInst.destroy();
+    histChartInst=new Chart(ctx,{type:'bar',data:{labels:labs,datasets:[{label:'Laba bersih',data:vals,backgroundColor:vals.map(v=>v>=0?'rgba(45,106,45,.75)':'rgba(163,45,45,.75)'),borderRadius:5,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fRF(c.parsed.y)}}},scales:{x:{ticks:{font:{size:11}},grid:{display:false}},y:{ticks:{font:{size:11},callback:v=>fR(v)}}}}});
+  }
+}
+
+function loadData(i){
+  const d=state.savedData[i];if(!d)return;
+  SO.forEach(sh=>state.shiftSaved[sh]=false);
+  state.sel={pagi:false,siang:false,malam:false};
+  d.shifts.forEach(sh=>state.sel[sh]=true);
+  if(d.biayaItems){state.biayaItems=[...d.biayaItems];state.biayaId=state.biayaItems.reduce((mx,i)=>Math.max(mx,i.id),0)+1;}
+  showPage('input');
+  setTimeout(()=>{
+    if(e('f-tanggal'))e('f-tanggal').value=d.tanggal;onTgl();
+    d.shifts.forEach(sh=>{BBM.forEach(b=>{
+      const sd=d.shiftData[sh][b];
+      const aEl=e(`${sh}-awal-${b}`);if(aEl&&!aEl.readOnly)aEl.value=sd.awal;
+      const jEl=e(`${sh}-jual-${b}`);if(jEl)jEl.value=sd.jual;
+      const tEl=e(`${sh}-tambah-${b}`);if(tEl)tEl.value=sd.tambah;
+      const hEl=e(`${sh}-habis-${b}`);if(hEl)hEl.checked=sd.habis||false;
+    });});
+    calcAll();renderBiaya();toast('Data '+d.tanggal+' dimuat!');
+  },100);
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: HARGA BBM
+// ════════════════════════════════════════════════════════════
+function renderHargaPage(main){
+  const rows=BBM.map(b=>{const hj=state.harga[b],hpp=state.harga['hpp_'+b],m=hj-hpp;const pct=hj>0?(m/hj*100):0;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td><input type="text" class="harga-inp" id="hj-${b}" value="${fN(hj)}" oninput="updateHarga('${b}')" style="width:130px"></td><td><input type="text" class="harga-inp" id="hpp-${b}" value="${fN(hpp)}" oninput="updateHarga('${b}')" style="width:130px"></td><td id="hm-${b}" style="font-weight:700;color:${m>=0?'var(--green)':'var(--red)'}">${m>=0?'Rp ':'-Rp '}${fN(Math.abs(m))}</td><td id="hmp-${b}" style="color:${m>=0?'var(--green)':'var(--red)'}">${(pct>=0?'':'-')+Math.abs(pct).toFixed(2)}%</td></tr>`;}).join('');
+
+  // Riwayat harga
+  const riwayat=state.riwayatHarga||[];
+  const riwayatRows=riwayat.length?riwayat.map((r,i)=>{
+    const tgl=r.tanggal;const ket=r.keterangan||'—';
+    const cols=BBM.map(b=>`<td style="text-align:right">Rp ${fN(r.harga[b]||0)}<br><small style="color:var(--text3)">HPP ${fN(r.harga['hpp_'+b]||0)}</small></td>`).join('');
+    return`<tr><td>${tgl}</td>${cols}<td>${ket}</td><td><button class="btn btn-del btn-sm" onclick="hapusRiwayatHarga(${i})" title="Hapus riwayat ini">🗑</button></td></tr>`;
+  }).join(''):`<tr><td colspan="7" class="empty-state" style="padding:16px">Belum ada riwayat perubahan harga.</td></tr>`;
+
+  // Harga yang berlaku hari ini
+  const today=new Date().toISOString().slice(0,10);
+  const hariIni=getHargaPadaTanggal(today,'pertalite');
+
+  main.innerHTML=`<div class="page-header"><div class="page-title">Harga BBM</div><div class="page-sub">Kelola harga jual, HPP, dan riwayat perubahan harga</div></div>
+
+  <div class="card">
+    <div class="card-title">🏷 Harga Aktif Saat Ini
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;color:var(--text3)">${riwayat.length?'Berlaku sejak: '+riwayat[0].tanggal:'Belum ada riwayat'}</span>
+      </div>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>Harga Jual (Rp/ltr)</th><th>HPP (Rp/ltr)</th><th>Margin/ltr</th><th>Margin %</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="g4" style="margin-top:16px">
+      ${BBM.map(b=>{const hj=state.harga[b],hpp=state.harga['hpp_'+b],m=hj-hpp;return`<div class="metric" id="hcard-${b}"><div class="metric-label">Margin ${BL[b]}</div><div class="metric-value ${m>=0?'c-green':'c-red'}" id="hmc-${b}">${m>=0?'':'-'}Rp ${fN(Math.abs(m))}/ltr</div></div>`;}).join('')}
+    </div>
+  </div>
+
+  <div class="card" style="border:2px solid var(--amber-light)">
+    <div class="card-title" style="color:var(--amber)">⚡ Catat Perubahan Harga BBM</div>
+    <div class="nt nt-w" style="margin-bottom:16px">
+      ⚠ Setiap kali harga BBM berubah, catat di sini sebelum input data hari baru. Data yang sudah tersimpan sebelum tanggal ini tetap menggunakan harga lama secara otomatis.
+    </div>
+    <div class="form-row cols-2" style="margin-bottom:12px">
+      <div class="fg">
+        <label>Tanggal Berlaku Harga Baru</label>
+        <input type="date" class="inp" id="rh-tanggal" value="${today}">
+      </div>
+      <div class="fg">
+        <label>Keterangan (opsional)</label>
+        <input type="text" class="inp" id="rh-ket" placeholder="cth: Penyesuaian Januari 2025">
+      </div>
+    </div>
+    <div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:14px;font-size:12px;color:var(--text2)">
+      📝 Pastikan harga di tabel atas sudah diperbarui ke harga baru, lalu klik tombol di bawah untuk menyimpan perubahan harga beserta tanggal berlakunya.
+    </div>
+    <button class="btn btn-save" onclick="konfirmasiSimpanRiwayatHarga()">💾 Simpan Perubahan Harga & Tanggal Berlaku</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📋 Riwayat Perubahan Harga <span style="font-size:11px;color:var(--text3);font-weight:400">(${riwayat.length} perubahan tercatat)</span></div>
+    <div class="nt nt-i" style="margin-bottom:12px">
+      ℹ Data penjualan yang tersimpan secara otomatis menggunakan harga yang berlaku pada tanggal tersebut.
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th style="text-align:left">Tanggal Berlaku</th><th>Pertalite</th><th>Pertamax</th><th>Dexlite</th><th>Biosolar</th><th style="text-align:left">Keterangan</th><th></th></tr></thead>
+      <tbody>${riwayatRows}</tbody>
+    </table></div>
+  </div>`;
+}
+
+function hapusRiwayatHarga(i){
+  if(!confirm('Hapus riwayat harga ini? Data penjualan yang mengacu pada riwayat ini akan menggunakan harga aktif.'))return;
+  state.riwayatHarga.splice(i,1);
+  dbSave();
+  renderHargaPage(e('main-content'));
+  toast('Riwayat harga dihapus.');
+}
+
+function konfirmasiSimpanRiwayatHarga(){
+  const tgl=e('rh-tanggal')?.value;
+  const ket=e('rh-ket')?.value||'';
+  if(!tgl){toast('Tanggal berlaku harus diisi!');return;}
+  // Tampilkan preview harga yang akan disimpan
+  const preview=BBM.map(b=>`${BL[b]}: Rp ${fN(state.harga[b])} (HPP: Rp ${fN(state.harga['hpp_'+b])})`).join('\n');
+  if(confirm(`Simpan perubahan harga berlaku mulai ${tgl}?\n\n${preview}\n\nData penjualan sebelum tanggal ini tetap menggunakan harga lama.`)){
+    simpanRiwayatHarga(tgl,ket);
+    toast('✓ Perubahan harga disimpan! Berlaku mulai '+tgl);
+    renderHargaPage(e('main-content'));
+  }
+}
+
+function updateHarga(b){
+  const hjRaw=parseInt((e('hj-'+b)?.value||'').replace(/\./g,''))||0;
+  const hppRaw=parseInt((e('hpp-'+b)?.value||'').replace(/\./g,''))||0;
+  state.harga[b]=hjRaw;state.harga['hpp_'+b]=hppRaw;
+  const m=hjRaw-hppRaw;const pct=hjRaw>0?(m/hjRaw*100):0;
+  const mEl=e('hm-'+b);if(mEl){mEl.textContent=(m>=0?'Rp ':'-Rp ')+fN(Math.abs(m));mEl.style.color=m>=0?'var(--green)':'var(--red)';}
+  const mpEl=e('hmp-'+b);if(mpEl){mpEl.textContent=(pct>=0?'':'-')+Math.abs(pct).toFixed(2)+'%';mpEl.style.color=m>=0?'var(--green)':'var(--red)';}
+  const mcEl=e('hmc-'+b);if(mcEl){mcEl.textContent=(m>=0?'':'-')+'Rp '+fN(Math.abs(m))+'/ltr';mcEl.className='metric-value '+(m>=0?'c-green':'c-red');}
+  dbSave();
+}
+
+// ════════════════════════════════════════════════════════════
+// PAGE: DATABASE
+// ════════════════════════════════════════════════════════════
+// ─── CLOUD SYNC ──────────────────────────────────────────────
+const CLOUD_KEY='spbu_cloud_url';
+function getCloudUrl(){return localStorage.getItem(CLOUD_KEY)||'';}
+function setCloudUrl(url){localStorage.setItem(CLOUD_KEY,url);}
+
+// Status indikator di topbar
+function setCloudStatus(status,msg){
+  const dot=document.querySelector('.db-dot');
+  const badge=document.querySelector('.db-badge');
+  if(!dot||!badge)return;
+  const map={
+    active:  {bg:'#4CAF50',text:'● Cloud Aktif'},
+    syncing: {bg:'#F5C518',text:'↻ Menyinkron...'},
+    error:   {bg:'#e53935',text:'✕ Gagal Sync'},
+    local:   {bg:'#4CAF50',text:'● LocalStorage'},
+    loading: {bg:'#F5C518',text:'↻ Memuat...'},
+  };
+  const s=map[status]||map.local;
+  dot.style.background=s.bg;
+  badge.querySelector('span+*')&&(badge.lastChild.textContent=' '+(msg||s.text));
+  if(!badge.dataset.orig)badge.dataset.orig=badge.textContent;
+  badge.innerHTML=`<span class="db-dot" style="background:${s.bg}"></span> ${msg||s.text}`;
+}
+
+// Kirim data satu hari ke cloud
+async function cloudSave(recData){
+  const url=getCloudUrl();
+  if(!url)return {ok:false,msg:'URL belum diatur'};
+  setCloudStatus('syncing');
+  try{
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'save',data:recData})});
+    const json=await res.json();
+    if(json.status==='ok'){setCloudStatus('active','● Tersimpan '+recData.tanggal);return {ok:true};}
+    setCloudStatus('error','✕ '+json.msg);return {ok:false,msg:json.msg};
+  }catch(err){setCloudStatus('error','✕ Tidak terhubung');return {ok:false,msg:err.message};}
+}
+
+// Muat semua data dari cloud
+async function cloudLoad(){
+  const url=getCloudUrl();
+  if(!url)return {ok:false,msg:'URL belum diatur'};
+  setCloudStatus('loading','↻ Memuat dari cloud...');
+  try{
+    const res=await fetch(url+'?action=load');
+    const json=await res.json();
+    if(json.status==='ok'){
+      state.savedData=json.data||[];
+      dbSave();
+      setCloudStatus('active','● Cloud Aktif');
+      return {ok:true,count:json.data.length};
+    }
+    setCloudStatus('error','✕ '+json.msg);return {ok:false,msg:json.msg};
+  }catch(err){setCloudStatus('error','✕ Tidak terhubung');return {ok:false,msg:err.message};}
+}
+
+// Kirim semua data lokal ke cloud (full sync)
+async function cloudSyncAll(){
+  const url=getCloudUrl();
+  if(!url){toast('⚠ URL Apps Script belum diatur!');return;}
+  if(!state.savedData.length){toast('Tidak ada data untuk disinkronkan.');return;}
+  setCloudStatus('syncing');
+  let ok=0,fail=0;
+  for(const rec of state.savedData){
+    const r=await cloudSave(rec);
+    if(r.ok)ok++;else fail++;
+  }
+  if(fail===0){toast('✓ Semua '+ok+' data berhasil disinkronkan ke cloud!');setCloudStatus('active','● '+ok+' data tersinkron');}
+  else{toast('⚠ '+ok+' berhasil, '+fail+' gagal.');setCloudStatus('error','✕ '+fail+' gagal');}
+  renderDBPage(e('main-content'));
+}
+
+function renderDBPage(main){
+  const dbSize=JSON.stringify(state).length;
+  const dbSizeKb=(dbSize/1024).toFixed(1);
+  const cloudUrl=getCloudUrl();
+  const isCloud=!!cloudUrl;
+  const cloudStatusHtml=isCloud
+    ?`<div class="metric" style="border-color:var(--green-light);background:var(--green-bg)">
+        <div class="metric-label">Cloud Sync</div>
+        <div class="metric-value c-green" style="font-size:13px">● Terhubung</div>
+        <div class="metric-sub">Google Sheets aktif</div>
+      </div>`
+    :`<div class="metric" style="border-color:var(--amber-light);background:var(--amber-bg)">
+        <div class="metric-label">Cloud Sync</div>
+        <div class="metric-value c-amber" style="font-size:13px">○ Belum diatur</div>
+        <div class="metric-sub">Hanya tersimpan lokal</div>
+      </div>`;
+
+  main.innerHTML=`
+  <div class="page-header">
+    <div class="page-title">Database & Cloud Sync</div>
+    <div class="page-sub">Kelola penyimpanan lokal dan sinkronisasi ke Google Sheets</div>
+  </div>
+
+  <!-- METRICS -->
+  <div class="g4">
+    <div class="metric"><div class="metric-label">Total Rekaman</div><div class="metric-value c-blue">${state.savedData.length}</div><div class="metric-sub">data hari</div></div>
+    <div class="metric"><div class="metric-label">Ukuran Lokal</div><div class="metric-value">${dbSizeKb} KB</div><div class="metric-sub">localStorage</div></div>
+    <div class="metric"><div class="metric-label">Mode</div><div class="metric-value" style="font-size:13px">${isCloud?'☁ Cloud+Lokal':'💾 Lokal Only'}</div></div>
+    ${cloudStatusHtml}
+  </div>
+
+  <!-- CLOUD SETUP -->
+  <div class="card" style="border:2px solid ${isCloud?'var(--green-light)':'var(--amber-light)'}">
+    <div class="card-title" style="color:${isCloud?'var(--green)':'var(--amber)'}">
+      ☁ Koneksi Google Sheets (Cloud)
+      ${isCloud?'<span class="state-badge sb-saved">✓ Terhubung</span>':'<span class="state-badge sb-edit">Belum diatur</span>'}
+    </div>
+
+    ${isCloud?`
+    <div class="nt nt-s" style="margin-bottom:14px">✓ Aplikasi terhubung ke Google Sheets. Setiap simpan data akan otomatis tersinkron ke cloud.</div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>URL Apps Script Aktif</label>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="inp" id="cloud-url-input" value="${cloudUrl}" style="font-size:11px;font-family:monospace">
+        <button class="btn btn-ghost" onclick="document.getElementById('cloud-url-input').type==='password'?document.getElementById('cloud-url-input').type='text':document.getElementById('cloud-url-input').type='password'">👁</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-save" onclick="simpanUrlCloud()">💾 Update URL</button>
+      <button class="btn btn-primary" onclick="testCloud()">🔌 Test Koneksi</button>
+      <button class="btn btn-ghost" onclick="muatDariCloud()">☁ Muat dari Cloud</button>
+      <button class="btn btn-ghost" onclick="cloudSyncAll()">↑ Sync Semua ke Cloud</button>
+      <button class="btn btn-reset" onclick="hapusUrlCloud()">✕ Putus Koneksi</button>
+    </div>`:`
+    <div class="nt nt-w" style="margin-bottom:14px">
+      ⚠ Tanpa cloud sync, data hanya tersimpan di browser perangkat ini. Manager dan owner tidak bisa berbagi data secara real-time.
+    </div>
+    <div style="background:var(--surface2);border-radius:var(--radius);padding:14px;margin-bottom:14px;font-size:13px;line-height:1.8">
+      <strong>Langkah setup (lakukan sekali):</strong><br>
+      1. Buka <a href="https://script.google.com" target="_blank" style="color:var(--blue)">script.google.com</a> → New Project<br>
+      2. Paste kode Apps Script di bawah → Deploy sebagai Web App<br>
+      3. Pilih <em>"Execute as: Me"</em> dan <em>"Anyone"</em><br>
+      4. Copy URL deployment → paste di bawah
+    </div>
+    <details style="margin-bottom:14px">
+      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--blue);padding:8px 0">📋 Lihat Kode Apps Script (klik untuk buka)</summary>
+      <pre style="background:var(--text);color:#e8e8e8;padding:14px;border-radius:var(--radius);font-size:11px;overflow-x:auto;margin-top:8px;line-height:1.6">const SHEET_ID = 'ISI_ID_SPREADSHEET_KAMU';
+const SHEET_NAME = 'Data';
+
+function doPost(e) {
+  try {
+    const payload = JSON.parse(e.postData.contents);
+    if (payload.action === 'save') return saveData(payload.data);
+    if (payload.action === 'loadAll') return loadAll();
+    return respond({status:'error',msg:'Unknown action'});
+  } catch(err) {
+    return respond({status:'error',msg:err.message});
+  }
+}
+
+function doGet(e) { return loadAll(); }
+
+function saveData(data) {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) sheet = ss.insertSheet(SHEET_NAME);
+  const rows = sheet.getLastRow() > 0
+    ? sheet.getRange(1,1,sheet.getLastRow(),1).getValues() : [];
+  let found = -1;
+  for (let i = 0; i &lt; rows.length; i++) {
+    if (rows[i][0] === data.tanggal) { found = i+1; break; }
+  }
+  const row = [data.tanggal, JSON.stringify(data), new Date().toISOString()];
+  if (found > 0) sheet.getRange(found,1,1,3).setValues([row]);
+  else sheet.appendRow(row);
+  if (sheet.getLastRow() > 1)
+    sheet.getRange(1,1,sheet.getLastRow(),3).sort({column:1,ascending:false});
+  return respond({status:'ok',tanggal:data.tanggal});
+}
+
+function loadAll() {
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  const sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet || sheet.getLastRow() === 0) return respond({status:'ok',data:[]});
+  const rows = sheet.getDataRange().getValues();
+  const data = rows.map(r => { try{return JSON.parse(r[1]);}catch(e){return null;} }).filter(Boolean);
+  return respond({status:'ok',data});
+}
+
+function respond(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+    </details>
+    <div class="fg" style="margin-bottom:12px">
+      <label>URL Apps Script (setelah deploy)</label>
+      <input type="text" class="inp" id="cloud-url-input" placeholder="https://script.google.com/macros/s/xxxxx/exec">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-save" onclick="simpanUrlCloud()">💾 Simpan & Aktifkan</button>
+      <button class="btn btn-ghost" onclick="testCloud()">🔌 Test Koneksi</button>
+    </div>`}
+  </div>
+
+  <!-- STATUS REALTIME -->
+  <div class="card" id="cloud-status-card" style="display:${isCloud?'block':'none'}">
+    <div class="card-title">📡 Status Sinkronisasi</div>
+    <div id="cloud-log" style="font-size:12px;color:var(--text2);line-height:2">
+      Tekan "Test Koneksi" untuk memeriksa status cloud.
+    </div>
+  </div>
+
+  <!-- EKSPOR / IMPOR LOKAL -->
+  <div class="card">
+    <div class="card-title">📁 Backup Lokal (JSON)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px">📤 Ekspor ke File JSON</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Download semua data sebagai file backup.</div>
+        <button class="btn btn-primary" onclick="exportData()">💾 Download Backup</button>
+      </div>
+      <div style="border:1px solid var(--border);border-radius:var(--radius);padding:16px">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px">📥 Impor dari File JSON</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:12px">Muat data dari file backup JSON.</div>
+        <label class="btn btn-ghost" style="cursor:pointer">📂 Pilih File <input type="file" accept=".json" style="display:none" onchange="importData(event)"></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- DANGER ZONE -->
+  <div class="card">
+    <div class="card-title" style="color:var(--red)">⚠ Zona Berbahaya</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px">Hapus semua data lokal. Data di cloud tidak ikut terhapus.</div>
+    <button class="btn btn-danger" onclick="if(confirm('HAPUS SEMUA DATA LOKAL? Data di cloud aman.')){state.savedData=[];dbSave();renderDBPage(e('main-content'));toast('Data lokal dihapus.')}">🗑 Hapus Data Lokal</button>
+  </div>`;
+}
+
+function simpanUrlCloud(){
+  const url=(document.getElementById('cloud-url-input')?.value||'').trim();
+  if(!url){toast('⚠ URL tidak boleh kosong!');return;}
+  if(!url.startsWith('https://')){toast('⚠ URL harus dimulai dengan https://');return;}
+  setCloudUrl(url);
+  toast('✓ URL disimpan! Menguji koneksi...');
+  renderDBPage(e('main-content'));
+  setTimeout(testCloud,500);
+}
+
+function hapusUrlCloud(){
+  if(!confirm('Putus koneksi cloud? Data lokal tetap aman.'))return;
+  localStorage.removeItem(CLOUD_KEY);
+  setCloudStatus('local','● LocalStorage');
+  renderDBPage(e('main-content'));
+  toast('Koneksi cloud diputus.');
+}
+
+async function testCloud(){
+  const url=getCloudUrl();
+  if(!url){toast('⚠ URL belum diatur!');return;}
+  const log=e('cloud-log');
+  const card=e('cloud-status-card');
+  if(card)card.style.display='block';
+  if(log)log.innerHTML='<span style="color:var(--amber)">↻ Menguji koneksi...</span>';
+  setCloudStatus('syncing');
+  try{
+    const res=await fetch(url+'?action=load');
+    if(!res.ok)throw new Error('HTTP '+res.status);
+    const json=await res.json();
+    if(json.status==='ok'){
+      setCloudStatus('active','● Cloud Aktif');
+      if(log)log.innerHTML=`<span style="color:var(--green)">✓ Koneksi berhasil!</span><br>
+        📊 Data di cloud: <strong>${json.data.length} rekaman</strong><br>
+        🕐 Diuji: ${new Date().toLocaleString('id-ID')}<br>
+        ${json.data.length?'📅 Data terbaru: <strong>'+json.data[0].tanggal+'</strong>':''}`;
+      toast('✓ Koneksi cloud berhasil! '+json.data.length+' rekaman ditemukan.');
+    }else{
+      throw new Error(json.msg||'Respons tidak valid');
+    }
+  }catch(err){
+    setCloudStatus('error','✕ Gagal');
+    if(log)log.innerHTML=`<span style="color:var(--red)">✕ Koneksi gagal: ${err.message}</span><br>
+      <span style="font-size:11px;color:var(--text2)">Pastikan URL benar dan Apps Script sudah di-deploy dengan akses "Anyone".</span>`;
+    toast('✕ Koneksi gagal: '+err.message);
+  }
+}
+
+async function muatDariCloud(){
+  if(!confirm('Muat semua data dari cloud? Data lokal akan diganti dengan data cloud.'))return;
+  const r=await cloudLoad();
+  if(r.ok){
+    toast('✓ '+r.count+' data berhasil dimuat dari cloud!');
+    renderDBPage(e('main-content'));
+    // Refresh halaman aktif
+    showPage(currentPage);
+  }else{
+    toast('✕ Gagal muat: '+r.msg);
+  }
+}
+
+function exportData(){
+  const json=JSON.stringify(state,null,2);
+  const blob=new Blob([json],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`spbu_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();URL.revokeObjectURL(url);
+  toast('✓ Data berhasil diekspor!');
+}
+
+function importData(ev){
+  const file=ev.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev2=>{
+    try{
+      const parsed=JSON.parse(ev2.target.result);
+      if(!parsed.savedData)throw new Error('Format file tidak valid');
+      Object.assign(state,parsed);dbSave();
+      toast('✓ Data berhasil diimpor! '+state.savedData.length+' rekaman.');
+      renderDBPage(e('main-content'));
+    }catch(err){toast('⚠ Gagal impor: '+err.message);}
+  };
+  reader.readAsText(file);
+}
+
+// ─── MISC ────────────────────────────────────────────────────
+
+// Cari stok akhir efektif dari hari sebelumnya di savedData
+function getPrevDayStock(tanggalStr,b){
+  if(!tanggalStr)return null;
+  const tgl=new Date(tanggalStr+'T00:00:00');
+  tgl.setDate(tgl.getDate()-1);
+  const prevTgl=tgl.getFullYear()+'-'+String(tgl.getMonth()+1).padStart(2,'0')+'-'+String(tgl.getDate()).padStart(2,'0');
+  const prevRec=state.savedData.find(d=>d.tanggal===prevTgl);
+  if(!prevRec)return null;
+  const lastShift=prevRec.shifts[prevRec.shifts.length-1];
+  return prevRec.shiftData[lastShift]?.[b]?.stokAkhirEfektif??null;
+}
+
+// Apakah tanggal ini adalah tanggal 1 bulan?
+function isTanggal1(tanggalStr){
+  if(!tanggalStr)return true;
+  return new Date(tanggalStr+'T00:00:00').getDate()===1;
+}
+
+function onTgl(){
+  const t=e('f-tanggal')?.value;
+  if(t&&e('f-hari'))e('f-hari').value=HARI[new Date(t+'T00:00:00').getDay()];
+  // Re-render shifts agar stok awal otomatis diupdate saat tanggal berubah
+  renderShifts();
+}
+
+// ─── INIT ────────────────────────────────────────────────────
+function init(){
+  dbLoad();
+  const now=new Date();
+  const tb=e('tb-date');
+  if(tb)tb.textContent=now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  showPage('input');
+  // Auto-load dari cloud saat pertama buka jika URL sudah diatur
+  if(getCloudUrl()){
+    setCloudStatus('loading','↻ Memuat dari cloud...');
+    cloudLoad().then(r=>{
+      if(r.ok){
+        setCloudStatus('active','● Cloud Aktif');
+        // Refresh halaman jika ada data baru
+        if(currentPage==='input')renderInputPage(e('main-content'));
+      }
+    });
+  }
+}
+init();
+</script>
+</body>
+</html>
