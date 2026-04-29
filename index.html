@@ -243,33 +243,158 @@ tr.row-saved{opacity:.8}
 .legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:10px;font-size:12px;color:var(--text2)}
 .ldot{width:10px;height:10px;border-radius:3px;display:inline-block}
 
-/* CONFIRM MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:1000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
-.modal{background:var(--surface);border-radius:var(--radius-lg);padding:24px;max-width:360px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2)}
-.modal-title{font-size:15px;font-weight:700;margin-bottom:8px}
-.modal-body{font-size:13px;color:var(--text2);margin-bottom:20px;line-height:1.6}
-.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+/* LOGIN SCREEN */
+.login-screen{position:fixed;inset:0;background:linear-gradient(135deg,#1A1916 0%,#2D2B27 50%,#1A1916 100%);display:flex;align-items:center;justify-content:center;z-index:9000;padding:20px}
+.login-screen::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 30% 50%,rgba(245,197,24,.08) 0%,transparent 60%),radial-gradient(ellipse at 70% 50%,rgba(24,95,165,.08) 0%,transparent 60%)}
+.login-box{background:#fff;border-radius:20px;padding:44px 40px;width:100%;max-width:420px;box-shadow:0 32px 80px rgba(0,0,0,.4);position:relative;z-index:1}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo .brand{font-size:26px;font-weight:700;display:inline-flex;align-items:center;gap:10px;color:#1A1916}
+.login-logo .brand span{background:#F5C518;color:#1A1916;padding:4px 10px;border-radius:7px;font-size:15px}
+.login-logo .sub{font-size:13px;color:#A09C95;margin-top:8px;letter-spacing:.02em}
+.login-divider{height:1px;background:#E4E0D8;margin-bottom:24px}
+.login-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:24px;background:#F1EFE9;border-radius:12px;padding:5px}
+.login-tab{padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .2s;background:transparent;color:#6B6760;letter-spacing:.01em}
+.login-tab.active{background:#fff;color:#1A1916;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.login-field{margin-bottom:18px}
+.login-field label{display:block;font-size:11px;font-weight:700;color:#6B6760;text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px}
+.login-field input{width:100%;padding:12px 14px;border:1.5px solid #E4E0D8;border-radius:10px;font-size:14px;font-family:var(--font);color:#1A1916;background:#FAFAF9;transition:all .15s}
+.login-field input:focus{outline:none;border-color:#185FA5;background:#fff;box-shadow:0 0 0 3px rgba(24,95,165,.1)}
+.login-field input::placeholder{color:#C0BDB7}
+.login-btn{width:100%;padding:13px;background:#1A1916;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .2s;margin-top:6px;letter-spacing:.02em}
+.login-btn:hover{background:#2D2B27;transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.2)}
+.login-btn:active{transform:translateY(0)}
+.login-btn.green{background:#2D6A2D}
+.login-btn.green:hover{background:#235223}
+.login-error{background:#FCEBEB;color:#A32D2D;border:1.5px solid #F7C1C1;border-radius:10px;padding:11px 14px;font-size:13px;margin-bottom:16px;display:none;font-weight:500}
+.login-error.show{display:block}
+.login-hint{font-size:11px;color:#A09C95;text-align:center;margin-top:16px;line-height:1.7;background:#F8F7F4;border-radius:8px;padding:10px 12px}
+.login-hint strong{color:#6B6760}
+
+/* DASHBOARD OWNER */
+.dash-greeting{margin-bottom:28px;padding:24px 28px;background:linear-gradient(135deg,#1A1916,#2D2B27);border-radius:16px;color:#fff;position:relative;overflow:hidden}
+.dash-greeting::after{content:'👑';position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:48px;opacity:.15}
+.dash-greeting h2{font-size:22px;font-weight:700;margin-bottom:6px;color:#fff}
+.dash-greeting p{font-size:13px;color:rgba(255,255,255,.6)}
+.dash-greeting .greet-stats{display:flex;gap:24px;margin-top:16px;flex-wrap:wrap}
+.dash-greeting .gs{display:flex;flex-direction:column;gap:2px}
+.dash-greeting .gs-label{font-size:10px;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.06em;font-weight:700}
+.dash-greeting .gs-val{font-size:16px;font-weight:700;color:#fff}
+.dash-kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:24px}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.06);position:relative;overflow:hidden;transition:box-shadow .15s,transform .15s}
+.kpi-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.1);transform:translateY(-1px)}
+.kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;border-radius:14px 14px 0 0}
+.kpi-card.kpi-green::before{background:linear-gradient(90deg,#2D6A2D,#4CAF50)}
+.kpi-card.kpi-blue::before{background:linear-gradient(90deg,#185FA5,#2196F3)}
+.kpi-card.kpi-red::before{background:linear-gradient(90deg,#A32D2D,#F44336)}
+.kpi-card.kpi-amber::before{background:linear-gradient(90deg,#854F0B,#FF9800)}
+.kpi-card.kpi-purple::before{background:linear-gradient(90deg,#534AB7,#9C27B0)}
+.kpi-card.kpi-teal::before{background:linear-gradient(90deg,#0D7C66,#26A69A)}
+.kpi-icon{font-size:20px;margin-bottom:10px;display:block}
+.kpi-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.kpi-value{font-size:21px;font-weight:800;color:var(--text);line-height:1.1}
+.kpi-value.kv-green{color:var(--green)}
+.kpi-value.kv-red{color:var(--red)}
+.kpi-value.kv-blue{color:var(--blue)}
+.kpi-sub{font-size:11px;color:var(--text3);margin-top:4px}
+.kpi-trend{font-size:11px;margin-top:5px;font-weight:700;display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:20px}
+.kpi-trend.up{color:#2D6A2D;background:#EAF3DE}
+.kpi-trend.down{color:#A32D2D;background:#FCEBEB}
+.dash-section{font-size:13px;font-weight:700;color:var(--text);margin:24px 0 12px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:.06em}
+.dash-section::after{content:'';flex:1;height:1px;background:var(--border)}
+.bbm-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.bbm-tile{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;text-align:center;transition:all .15s}
+.bbm-tile:hover{border-color:var(--border2);box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.bbm-tile-name{margin-bottom:8px}
+.bbm-tile-vol{font-size:18px;font-weight:800;color:var(--text)}
+.bbm-tile-sub{font-size:11px;color:var(--text3);margin-top:2px}
+.bbm-tile-laba{font-size:12px;font-weight:700;margin-top:5px;padding:3px 0}
+
+/* ROLE BADGE */
+.role-badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.03em;display:inline-flex;align-items:center;gap:4px}
+.role-owner{background:#F5C518;color:#1A1916}
+.role-manager{background:rgba(24,95,165,.2);color:rgba(255,255,255,.9);border:.5px solid rgba(24,95,165,.4)}
+
+/* USER MENU */
+.user-menu{display:flex;align-items:center;gap:10px}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,#185FA5,#2196F3);color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.user-avatar.owner{background:linear-gradient(135deg,#854F0B,#F5C518);color:#1A1916}
+.logout-btn{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:5px 14px;border-radius:20px;font-size:11px;cursor:pointer;font-family:var(--font);font-weight:600;transition:all .15s}
+.logout-btn:hover{background:rgba(255,255,255,.2);color:#fff}
+
+/* MANAGER BANNER */
+.manager-banner{background:linear-gradient(135deg,var(--blue-bg),#EEF7FF);border:1px solid var(--blue-light);border-radius:var(--radius);padding:14px 18px;margin-bottom:16px;font-size:13px;color:var(--blue);display:flex;align-items:center;gap:10px}
+
+/* QUICK ACTION CARDS */
+.quick-actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:4px}
+.qa-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;color:var(--text)}
+.qa-card:hover{background:var(--surface);border-color:var(--border2);box-shadow:0 2px 8px rgba(0,0,0,.08);transform:translateY(-1px)}
+.qa-icon{font-size:24px;margin-bottom:8px;display:block}
+.qa-label{font-size:12px;font-weight:600;color:var(--text2)}
+
+@media(max-width:768px){
+  .bbm-grid{grid-template-columns:repeat(2,1fr)}
+  .dash-kpi{grid-template-columns:repeat(2,1fr)}
+  .login-box{padding:32px 24px}
+  .quick-actions{grid-template-columns:repeat(2,1fr)}
+}
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
 
+<!-- LOGIN SCREEN -->
+<div id="login-screen" class="login-screen">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="brand"><span>SPBU</span> Manager</div>
+      <div class="sub">Sistem Manajemen Penjualan BBM</div>
+    </div>
+    <div class="login-divider"></div>
+    <div class="login-tabs">
+      <button class="login-tab active" id="tab-owner" onclick="switchLoginTab('owner')">👑 Owner</button>
+      <button class="login-tab" id="tab-manager" onclick="switchLoginTab('manager')">🔧 Manager</button>
+    </div>
+    <div id="login-error" class="login-error">❌ Password salah. Silakan coba lagi.</div>
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="login-password" placeholder="Masukkan password..." onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Masuk →</button>
+    <div class="login-hint">
+      Password default: Owner = <strong>owner123</strong> &nbsp;|&nbsp; Manager = <strong>manager123</strong><br>
+      Ganti password di menu Database setelah masuk.
+    </div>
+  </div>
+</div>
+
 <!-- TOPBAR -->
-<div class="topbar">
+<div class="topbar" id="main-topbar" style="display:none">
   <div class="topbar-brand">
     <span>SPBU</span> Manager
+    <span id="tb-role-badge" class="role-badge role-owner" style="font-size:10px"></span>
   </div>
   <div class="topbar-info">
     <div class="db-badge"><span class="db-dot"></span> LocalStorage Active</div>
     <span id="tb-date" style="font-size:12px;color:rgba(255,255,255,.5)"></span>
+    <div class="user-menu">
+      <div class="user-avatar" id="tb-avatar">O</div>
+      <button class="logout-btn" onclick="doLogout()">Keluar</button>
+    </div>
   </div>
 </div>
 
 <!-- LAYOUT -->
-<div class="layout">
+<div class="layout" id="main-layout" style="display:none">
   <!-- SIDEBAR -->
-  <nav class="sidebar">
+  <nav class="sidebar" id="main-sidebar">
+    <div id="nav-owner-section">
+      <div class="nav-section">Dashboard</div>
+      <a class="nav-item" onclick="showPage('dashboard')" href="#" id="nav-dashboard">
+        <span class="nav-icon">🏠</span> Dashboard
+      </a>
+      <div class="nav-divider"></div>
+    </div>
     <div class="nav-section">Operasional</div>
     <a class="nav-item active" onclick="showPage('input')" href="#">
       <span class="nav-icon">✚</span> Input Data
@@ -288,15 +413,15 @@ tr.row-saved{opacity:.8}
     <a class="nav-item" onclick="showPage('histori')" href="#">
       <span class="nav-icon">📋</span> Histori
     </a>
-    <a class="nav-item" onclick="showPage('rekap')" href="#">
+    <a class="nav-item" id="nav-rekap" onclick="showPage('rekap')" href="#">
       <span class="nav-icon">📊</span> Rekap & Laporan
     </a>
-    <a class="nav-item" onclick="showPage('harga')" href="#">
+    <a class="nav-item" id="nav-harga" onclick="showPage('harga')" href="#">
       <span class="nav-icon">🏷</span> Harga BBM
     </a>
     <div class="nav-divider"></div>
     <div class="nav-section">Sistem</div>
-    <a class="nav-item" onclick="showPage('database')" href="#">
+    <a class="nav-item" id="nav-database" onclick="showPage('database')" href="#">
       <span class="nav-icon">💾</span> Database
     </a>
   </nav>
@@ -319,6 +444,84 @@ const SI={pagi:{label:'Shift Pagi',hdr:'sh-p',dot:'dp',time:'06.00–14.00'},sia
 const DEF={pagi:{pertalite:{awal:0,jual:0,tambah:0},pertamax:{awal:0,jual:0,tambah:0},dexlite:{awal:0,jual:0,tambah:0},biosolar:{awal:0,jual:0,tambah:0}},siang:{pertalite:{jual:0,tambah:0},pertamax:{jual:0,tambah:0},dexlite:{jual:0,tambah:0},biosolar:{jual:0,tambah:0}},malam:{pertalite:{jual:0,tambah:0},pertamax:{jual:0,tambah:0},dexlite:{jual:0,tambah:0},biosolar:{jual:0,tambah:0}}};
 const CATS={gaji:{label:'Gaji/Upah',bg:'#EAF3DE',color:'#2D6A2D'},listrik:{label:'Listrik & Air',bg:'#E6F1FB',color:'#185FA5'},perawatan:{label:'Perawatan',bg:'#FAEEDA',color:'#854F0B'},administrasi:{label:'Administrasi',bg:'#EEEDFE',color:'#534AB7'},lainnya:{label:'Lain-lain',bg:'#F1EFE8',color:'#5F5E5A'}};
 const DB_KEY='spbu_manager_v1';
+const AUTH_KEY='spbu_auth_session';
+const PWD_KEY='spbu_passwords';
+
+// ─── AUTH SYSTEM ──────────────────────────────────────────────
+let currentUser=null; // {role:'owner'|'manager', name:'Owner'|'Manager'}
+let loginTab='owner';
+
+function getPasswords(){
+  try{const d=localStorage.getItem(PWD_KEY);return d?JSON.parse(d):{owner:'owner123',manager:'manager123'};}
+  catch(e){return {owner:'owner123',manager:'manager123'};}
+}
+function savePasswords(pw){localStorage.setItem(PWD_KEY,JSON.stringify(pw));}
+
+function switchLoginTab(tab){
+  loginTab=tab;
+  document.getElementById('tab-owner').classList.toggle('active',tab==='owner');
+  document.getElementById('tab-manager').classList.toggle('active',tab==='manager');
+  document.getElementById('login-btn').className='login-btn '+(tab==='owner'?'':'green');
+  document.getElementById('login-password').value='';
+  document.getElementById('login-error').classList.remove('show');
+}
+
+function doLogin(){
+  const pwd=document.getElementById('login-password').value;
+  const passwords=getPasswords();
+  const errEl=document.getElementById('login-error');
+  if(pwd===passwords[loginTab]){
+    errEl.classList.remove('show');
+    currentUser={role:loginTab,name:loginTab==='owner'?'Owner':'Manager'};
+    localStorage.setItem(AUTH_KEY,JSON.stringify(currentUser));
+    showApp();
+  }else{
+    errEl.classList.add('show');
+    errEl.textContent='Password salah. Coba lagi.';
+    document.getElementById('login-password').value='';
+    document.getElementById('login-password').focus();
+  }
+}
+
+function doLogout(){
+  if(!confirm('Keluar dari aplikasi?'))return;
+  localStorage.removeItem(AUTH_KEY);
+  currentUser=null;
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('main-topbar').style.display='none';
+  document.getElementById('main-layout').style.display='none';
+  document.getElementById('login-password').value='';
+  switchLoginTab('owner');
+}
+
+function showApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('main-topbar').style.display='flex';
+  document.getElementById('main-layout').style.display='flex';
+  // Update topbar
+  const isOwner=currentUser.role==='owner';
+  const badge=document.getElementById('tb-role-badge');
+  badge.textContent=isOwner?'👑 Owner':'🔧 Manager';
+  badge.className='role-badge '+(isOwner?'role-owner':'role-manager');
+  document.getElementById('tb-avatar').textContent=isOwner?'O':'M';
+  // Sembunyikan menu yang tidak diizinkan untuk manager
+  const ownerSection=document.getElementById('nav-owner-section');
+  const navRekap=document.getElementById('nav-rekap');
+  const navHarga=document.getElementById('nav-harga');
+  const navDb=document.getElementById('nav-database');
+  if(isOwner){
+    ownerSection.style.display='block';
+    navRekap.style.display='flex';
+    navHarga.style.display='flex';
+    navDb.style.display='flex';
+  }else{
+    ownerSection.style.display='none';
+    navRekap.style.display='none';
+    navHarga.style.display='none';
+    navDb.style.display='none';
+  }
+  init();
+}
 
 // ─── STATE ──────────────────────────────────────────────────
 let state={sel:{pagi:true,siang:false,malam:false},shiftSaved:{pagi:false,siang:false,malam:false},biayaItems:[],biayaId:1,savedData:[],harga:{pertalite:10000,hpp_pertalite:9998,pertamax:13200,hpp_pertamax:13235,dexlite:14550,hpp_dexlite:15099,biosolar:6800,hpp_biosolar:6799},riwayatHarga:[]};
@@ -381,14 +584,22 @@ function calcRow(awal,jual,tambah,habis){
 
 // ─── PAGE ROUTER ─────────────────────────────────────────────
 function showPage(name){
+  // Proteksi akses untuk manager
+  if(currentUser&&currentUser.role==='manager'){
+    const ownerOnly=['dashboard','rekap','harga','database'];
+    if(ownerOnly.includes(name)){toast('⚠ Akses terbatas. Fitur ini hanya untuk Owner.');return;}
+  }
   currentPage=name;
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  const navMap={input:0,stok:1,laba:2,selisih:3,histori:5,rekap:6,harga:7,database:9};
+  const isOwner=currentUser&&currentUser.role==='owner';
+  // navMap: index di seluruh .nav-item (termasuk yg hidden)
+  const navMap={dashboard:0,input:isOwner?2:0,stok:isOwner?3:1,laba:isOwner?4:2,selisih:isOwner?5:3,histori:isOwner?7:5,rekap:isOwner?8:6,harga:isOwner?9:7,database:isOwner?11:9};
   const allNav=document.querySelectorAll('.nav-item');
   if(allNav[navMap[name]])allNav[navMap[name]].classList.add('active');
   const main=e('main-content');
   if(!main)return;
-  if(name==='input')renderInputPage(main);
+  if(name==='dashboard')renderDashboardPage(main);
+  else if(name==='input')renderInputPage(main);
   else if(name==='stok')renderStokPage(main);
   else if(name==='laba')renderLabaPage(main);
   else if(name==='selisih')renderSelisihPage(main);
@@ -399,8 +610,195 @@ function showPage(name){
 }
 
 // ════════════════════════════════════════════════════════════
-// PAGE: INPUT DATA
+// PAGE: DASHBOARD (OWNER ONLY)
 // ════════════════════════════════════════════════════════════
+function renderDashboardPage(main){
+  const data=state.savedData;
+  const now=new Date();
+  const greetText=now.getHours()<12?'Selamat Pagi 🌅':now.getHours()<17?'Selamat Siang ☀️':'Selamat Malam 🌙';
+
+  if(!data.length){
+    main.innerHTML=`
+    <div class="dash-greeting">
+      <h2>${greetText}, Owner!</h2>
+      <p>${now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    </div>
+    <div class="card" style="text-align:center;padding:48px">
+      <div style="font-size:48px;margin-bottom:16px">📭</div>
+      <div style="font-size:16px;font-weight:700;margin-bottom:8px">Belum ada data</div>
+      <div style="font-size:13px;color:var(--text2);margin-bottom:20px">Manager belum menginput data penjualan.</div>
+      <button class="btn btn-primary" onclick="showPage('input')">✚ Input Data Sekarang</button>
+    </div>`;
+    return;
+  }
+
+  const today=data[0];
+  const todayDate=today.tanggal;
+  const last7=[...data].slice(0,7);
+  const totalOmzet7=last7.reduce((s,d)=>s+(d.totalOmzet||0),0);
+  const totalLaba7=last7.reduce((s,d)=>s+(d.labaBersih||0),0);
+  const avgLaba7=Math.round(totalLaba7/last7.length);
+  const totalLosses7=last7.reduce((s,d)=>s+(d.tLRp||0),0);
+  const totalVol7=last7.reduce((s,d)=>s+(d.totalJual||0),0);
+  const hariIniLaba=today.labaBersih||0;
+  const hariIniOmzet=today.totalOmzet||0;
+  const hariIniVol=today.totalJual||0;
+  const kemarin=data[1]||null;
+  const trendLaba=kemarin&&kemarin.labaBersih?((hariIniLaba-kemarin.labaBersih)/Math.abs(kemarin.labaBersih)*100):0;
+  const marginPct=hariIniOmzet>0?(hariIniLaba/hariIniOmzet*100):0;
+
+  // BBM breakdown
+  const bbmData=BBM.map(b=>{
+    let vol=0,losses=0;
+    today.shifts.forEach(sh=>{const sd=today.shiftData[sh]?.[b]||{};vol+=(sd.jual||0)+(sd.plus||0);losses+=sd.losses||0;});
+    const hSnap=today.hargaSnapshot;
+    const hj=hSnap?hSnap[b]:gHJ(b);
+    const hpp=hSnap?hSnap['hpp_'+b]:gHPP(b);
+    return{b,vol,laba:vol*(hj-hpp),losses,hj};
+  });
+
+  const bbmTiles=bbmData.map(({b,vol,laba,losses})=>`
+    <div class="bbm-tile">
+      <div class="bbm-tile-name"><span class="tag ${BT[b]}">${BL[b]}</span></div>
+      <div class="bbm-tile-vol">${fN(vol)}<span style="font-size:12px;font-weight:400;color:var(--text3)"> ltr</span></div>
+      <div class="bbm-tile-laba" style="color:${laba>=0?'var(--green)':'var(--red)'}">${fRF(laba)}</div>
+      ${losses>0?`<div style="font-size:10px;color:var(--red);margin-top:2px">⚠ ${fN(losses)} ltr losses</div>`:''}
+    </div>`).join('');
+
+  // Riwayat rows
+  const histRows=[...last7].reverse().map((d,i)=>{
+    const isToday=i===last7.length-1;
+    return`<tr style="${isToday?'background:var(--green-bg)':''}">
+      <td>
+        <div style="font-weight:600">${d.tanggal}</div>
+        <div style="font-size:11px;color:var(--text3)">${d.hari||''} ${isToday?'<span style="color:var(--green);font-weight:700">● Hari ini</span>':''}</div>
+      </td>
+      <td>${fN(d.totalJual||0)} ltr</td>
+      <td>${fR(d.totalOmzet||0)}</td>
+      <td style="color:${(d.labaBersih||0)>=0?'var(--green)':'var(--red)'};font-weight:700">${fRF(d.labaBersih||0)}</td>
+      <td style="color:${(d.tLRp||0)>0?'var(--red)':'var(--text3)'};font-size:12px">${(d.tLRp||0)>0?'-'+fRF(d.tLRp):'—'}</td>
+    </tr>`;}).join('');
+
+  main.innerHTML=`
+  <!-- GREETING BANNER -->
+  <div class="dash-greeting">
+    <h2>${greetText}, Owner!</h2>
+    <p>${now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
+    <div class="greet-stats">
+      <div class="gs"><span class="gs-label">Data Terakhir</span><span class="gs-val">${todayDate}</span></div>
+      <div class="gs"><span class="gs-label">Total Data</span><span class="gs-val">${data.length} hari</span></div>
+      <div class="gs"><span class="gs-label">Cloud</span><span class="gs-val" style="font-size:13px">${getCloudUrl()?'● Terhubung':'○ Lokal'}</span></div>
+    </div>
+  </div>
+
+  <!-- KPI HARI INI -->
+  <div class="dash-section">Hari Ini — ${todayDate}</div>
+  <div class="dash-kpi">
+    <div class="kpi-card kpi-blue">
+      <span class="kpi-icon">🛢</span>
+      <div class="kpi-label">Volume Terjual</div>
+      <div class="kpi-value kv-blue">${fN(hariIniVol)}</div>
+      <div class="kpi-sub">liter terjual</div>
+    </div>
+    <div class="kpi-card kpi-green">
+      <span class="kpi-icon">💵</span>
+      <div class="kpi-label">Omzet Kotor</div>
+      <div class="kpi-value">${fR(hariIniOmzet)}</div>
+      <div class="kpi-sub">pendapatan bruto</div>
+    </div>
+    <div class="kpi-card ${hariIniLaba>=0?'kpi-green':'kpi-red'}">
+      <span class="kpi-icon">${hariIniLaba>=0?'📈':'📉'}</span>
+      <div class="kpi-label">Laba Bersih</div>
+      <div class="kpi-value ${hariIniLaba>=0?'kv-green':'kv-red'}">${fR(hariIniLaba)}</div>
+      ${kemarin?`<div class="kpi-trend ${trendLaba>=0?'up':'down'}">${trendLaba>=0?'▲':'▼'} ${Math.abs(trendLaba).toFixed(1)}% vs kemarin</div>`:'<div class="kpi-sub">—</div>'}
+    </div>
+    <div class="kpi-card kpi-teal">
+      <span class="kpi-icon">%</span>
+      <div class="kpi-label">Net Margin</div>
+      <div class="kpi-value ${marginPct>=0?'kv-green':'kv-red'}">${marginPct.toFixed(1)}%</div>
+      <div class="kpi-sub">laba / omzet</div>
+    </div>
+    <div class="kpi-card ${(today.tLRp||0)>0?'kpi-red':'kpi-green'}">
+      <span class="kpi-icon">${(today.tLRp||0)>0?'⚠️':'✅'}</span>
+      <div class="kpi-label">Losses</div>
+      <div class="kpi-value ${(today.tLRp||0)>0?'kv-red':''}">${(today.tLRp||0)>0?'-'+fRF(today.tLRp):'Nihil'}</div>
+      <div class="kpi-sub">${(today.tLRp||0)>0?'perlu perhatian':'semua normal'}</div>
+    </div>
+    <div class="kpi-card kpi-amber">
+      <span class="kpi-icon">🔄</span>
+      <div class="kpi-label">Shift Hari Ini</div>
+      <div class="kpi-value">${today.shifts.length}</div>
+      <div class="kpi-sub">${today.shifts.map(s=>s.charAt(0).toUpperCase()+s.slice(1)).join(' + ')}</div>
+    </div>
+  </div>
+
+  <!-- BBM BREAKDOWN -->
+  <div class="dash-section">Penjualan per BBM — Hari Ini</div>
+  <div class="bbm-grid">${bbmTiles}</div>
+
+  <!-- KPI 7 HARI -->
+  <div class="dash-section">7 Hari Terakhir</div>
+  <div class="dash-kpi">
+    <div class="kpi-card kpi-blue">
+      <span class="kpi-icon">📦</span>
+      <div class="kpi-label">Total Volume</div>
+      <div class="kpi-value">${fN(totalVol7)}</div>
+      <div class="kpi-sub">liter</div>
+    </div>
+    <div class="kpi-card kpi-green">
+      <span class="kpi-icon">💰</span>
+      <div class="kpi-label">Total Omzet</div>
+      <div class="kpi-value">${fR(totalOmzet7)}</div>
+    </div>
+    <div class="kpi-card ${totalLaba7>=0?'kpi-green':'kpi-red'}">
+      <span class="kpi-icon">💹</span>
+      <div class="kpi-label">Total Laba</div>
+      <div class="kpi-value ${totalLaba7>=0?'kv-green':'kv-red'}">${fR(totalLaba7)}</div>
+    </div>
+    <div class="kpi-card kpi-amber">
+      <span class="kpi-icon">📊</span>
+      <div class="kpi-label">Rata-rata/Hari</div>
+      <div class="kpi-value ${avgLaba7>=0?'kv-green':'kv-red'}">${fR(avgLaba7)}</div>
+    </div>
+    <div class="kpi-card ${totalLosses7>0?'kpi-red':'kpi-green'}">
+      <span class="kpi-icon">🔒</span>
+      <div class="kpi-label">Total Losses</div>
+      <div class="kpi-value ${totalLosses7>0?'kv-red':''}">${totalLosses7>0?'-'+fRF(totalLosses7):'Nihil'}</div>
+    </div>
+    <div class="kpi-card kpi-purple">
+      <span class="kpi-icon">📆</span>
+      <div class="kpi-label">Hari Tercatat</div>
+      <div class="kpi-value">${data.length}</div>
+      <div class="kpi-sub">total data</div>
+    </div>
+  </div>
+
+  <!-- RIWAYAT + AKSI -->
+  <div style="display:grid;grid-template-columns:1fr 280px;gap:16px;align-items:start">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-title">📋 Riwayat 7 Hari
+        <button class="btn btn-ghost btn-sm" onclick="showPage('rekap')">Rekap Lengkap →</button>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr>
+          <th style="text-align:left">Tanggal</th>
+          <th>Volume</th>
+          <th>Omzet</th>
+          <th>Laba Bersih</th>
+          <th style="color:var(--red)">Losses</th>
+        </tr></thead>
+        <tbody>${histRows}</tbody>
+      </table></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);padding:0 2px;text-transform:uppercase;letter-spacing:.06em">Aksi Cepat</div>
+      <a onclick="showPage('rekap')" href="#" class="qa-card"><span class="qa-icon">📊</span><div class="qa-label">Rekap & Laporan</div></a>
+      <a onclick="showPage('histori')" href="#" class="qa-card"><span class="qa-icon">📋</span><div class="qa-label">Histori Data</div></a>
+      <a onclick="showPage('harga')" href="#" class="qa-card"><span class="qa-icon">🏷</span><div class="qa-label">Kelola Harga BBM</div></a>
+      <a onclick="showPage('database')" href="#" class="qa-card"><span class="qa-icon">☁</span><div class="qa-label">Cloud & Database</div></a>
+    </div>
+  </div>`;
+}
 function renderInputPage(main){
   main.innerHTML=`
   <div class="page-header">
@@ -1806,6 +2204,24 @@ function respond(obj) {
     </div>
   </div>
 
+  <!-- GANTI PASSWORD (owner only) -->
+  ${currentUser&&currentUser.role==='owner'?`
+  <div class="card" style="border:1.5px solid var(--amber-light)">
+    <div class="card-title" style="color:var(--amber)">🔑 Ganti Password</div>
+    <div class="nt nt-w" style="margin-bottom:14px">Ganti password default sebelum digunakan secara live. Password disimpan di browser ini.</div>
+    <div class="g2" style="margin-bottom:14px">
+      <div class="fg">
+        <label>Password Owner (baru)</label>
+        <input type="password" class="inp" id="new-pwd-owner" placeholder="Password owner baru">
+      </div>
+      <div class="fg">
+        <label>Password Manager (baru)</label>
+        <input type="password" class="inp" id="new-pwd-manager" placeholder="Password manager baru">
+      </div>
+    </div>
+    <button class="btn btn-save" onclick="gantiPassword()">💾 Simpan Password Baru</button>
+  </div>`:''}
+
   <!-- DANGER ZONE -->
   <div class="card">
     <div class="card-title" style="color:var(--red)">⚠ Zona Berbahaya</div>
@@ -1928,25 +2344,53 @@ function onTgl(){
 }
 
 // ─── INIT ────────────────────────────────────────────────────
+function gantiPassword(){
+  const ownerPwd=document.getElementById('new-pwd-owner')?.value?.trim();
+  const managerPwd=document.getElementById('new-pwd-manager')?.value?.trim();
+  if(!ownerPwd&&!managerPwd){toast('⚠ Isi minimal satu password baru!');return;}
+  const current=getPasswords();
+  if(ownerPwd){if(ownerPwd.length<4){toast('⚠ Password minimal 4 karakter!');return;}current.owner=ownerPwd;}
+  if(managerPwd){if(managerPwd.length<4){toast('⚠ Password minimal 4 karakter!');return;}current.manager=managerPwd;}
+  savePasswords(current);
+  if(document.getElementById('new-pwd-owner'))document.getElementById('new-pwd-owner').value='';
+  if(document.getElementById('new-pwd-manager'))document.getElementById('new-pwd-manager').value='';
+  toast('✓ Password berhasil diperbarui!');
+}
+
 function init(){
   dbLoad();
   const now=new Date();
   const tb=e('tb-date');
   if(tb)tb.textContent=now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  showPage('input');
+  // Mulai di halaman yang sesuai role
+  const startPage=currentUser&&currentUser.role==='owner'?'dashboard':'input';
+  showPage(startPage);
   // Auto-load dari cloud saat pertama buka jika URL sudah diatur
   if(getCloudUrl()){
     setCloudStatus('loading','↻ Memuat dari cloud...');
     cloudLoad().then(r=>{
       if(r.ok){
         setCloudStatus('active','● Cloud Aktif');
-        // Refresh halaman jika ada data baru
-        if(currentPage==='input')renderInputPage(e('main-content'));
+        if(currentPage==='input'||currentPage==='dashboard')showPage(startPage);
       }
     });
   }
 }
-init();
+
+// ─── BOOT ────────────────────────────────────────────────
+// Cek session tersimpan
+(function boot(){
+  try{
+    const sess=localStorage.getItem(AUTH_KEY);
+    if(sess){
+      currentUser=JSON.parse(sess);
+      showApp();
+    }
+    // Kalau tidak ada session, login screen sudah tampil by default
+  }catch(e){
+    // Session invalid, tetap di login screen
+  }
+})();
 </script>
 </body>
 </html>
