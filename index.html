@@ -331,11 +331,30 @@ tr.row-saved{opacity:.8}
 .qa-icon{font-size:24px;margin-bottom:8px;display:block}
 .qa-label{font-size:12px;font-weight:600;color:var(--text2)}
 
+/* LAPORAN KEUANGAN */
+.lk-tbl{width:100%;border-collapse:collapse;font-size:13px;background:var(--surface)}
+.lk-tbl td{padding:8px 16px;vertical-align:middle;border:none}
+.lk-num{text-align:right;font-family:'IBM Plex Mono',monospace;letter-spacing:.02em;white-space:nowrap}
+
+.lk-section td{background:var(--text);color:#fff;font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:10px 16px}
+
+.lk-item td{font-weight:500;color:var(--text);border-bottom:1px solid var(--border)}
+.lk-item:hover td{background:var(--surface2)}
+
+.lk-total{background:var(--surface2)}
+.lk-total td{font-weight:700;border-top:2px solid var(--text);border-bottom:1px solid var(--border)}
+.lk-total.lk-double td{border-top:3px double var(--text);border-bottom:3px double var(--text);background:rgba(245,197,24,.06);padding:10px 16px}
+
+.lk-margin td{background:var(--surface);font-size:12px;border-bottom:1px solid var(--border)}
+
+.lk-sep td{height:14px;background:var(--bg);border:none}
+
 @media(max-width:768px){
   .bbm-grid{grid-template-columns:repeat(2,1fr)}
   .dash-kpi{grid-template-columns:repeat(2,1fr)}
   .login-box{padding:32px 24px}
   .quick-actions{grid-template-columns:repeat(2,1fr)}
+  .lk-tbl td{padding:6px 10px;font-size:12px}
 }
 </style>
 
@@ -367,7 +386,8 @@ tr.row-saved{opacity:.8}
     <button class="login-btn" id="login-btn" onclick="doLogin()">Masuk →</button>
     <div class="login-hint">
       Password default: Owner = <strong>owner123</strong> &nbsp;|&nbsp; Manager = <strong>manager123</strong><br>
-      Ganti password di menu Database setelah masuk.
+      Ganti password di menu Database setelah masuk.<br>
+      <a href="#" onclick="event.preventDefault();if(confirm('Reset semua sesi & data login? Data tersimpan tidak akan terhapus.')){localStorage.removeItem('spbu_auth_session');localStorage.removeItem('spbu_users');localStorage.removeItem('spbu_passwords');location.reload()}" style="color:var(--blue);font-size:10px;text-decoration:underline;margin-top:6px;display:inline-block">🔄 Reset Login</a>
     </div>
   </div>
 </div>
@@ -450,6 +470,26 @@ const CATS={gaji:{label:'Gaji/Upah',bg:'#EAF3DE',color:'#2D6A2D'},listrik:{label
 const DB_KEY='spbu_manager_v1';
 const AUTH_KEY='spbu_auth_session';
 const PWD_KEY='spbu_passwords';
+const PROFIL_KEY='spbu_profil';
+
+// ─── PROFIL PERUSAHAAN ───────────────────────────────────────
+function getProfil(){
+  try{const d=localStorage.getItem(PROFIL_KEY);return d?JSON.parse(d):{nama:'SPBU Saya',noSpbu:'',alamat:'',telp:''};}
+  catch(e){return{nama:'SPBU Saya',noSpbu:'',alamat:'',telp:''};}
+}
+function saveProfil(p){localStorage.setItem(PROFIL_KEY,JSON.stringify(p));}
+function simpanProfil(){
+  const nama=(document.getElementById('profil-nama')||{}).value||'';
+  const noSpbu=(document.getElementById('profil-nospbu')||{}).value||'';
+  const alamat=(document.getElementById('profil-alamat')||{}).value||'';
+  const telp=(document.getElementById('profil-telp')||{}).value||'';
+  if(!nama){toast('⚠ Nama perusahaan tidak boleh kosong!');return;}
+  saveProfil({nama,noSpbu,alamat,telp});
+  // Update topbar brand
+  const brand=document.querySelector('.topbar-brand');
+  if(brand)brand.innerHTML='<span>SPBU</span> '+nama;
+  toast('✓ Profil perusahaan disimpan!');
+}
 const USERS_KEY='spbu_users';
 
 // ─── AUTH SYSTEM ──────────────────────────────────────────────
@@ -465,6 +505,7 @@ const ALL_MENUS=[
   {id:'selisih',label:'Losses & Plus',icon:'⚖'},
   {id:'histori',label:'Histori',icon:'📋'},
   {id:'rekap',label:'Rekap & Laporan',icon:'📊'},
+  {id:'lapkeu',label:'Laporan Keuangan',icon:'📑'},
   {id:'harga',label:'Harga BBM',icon:'🏷'},
   {id:'database',label:'Database',icon:'💾'},
 ];
@@ -472,8 +513,28 @@ const OWNER_DEFAULT_MENUS=ALL_MENUS.map(m=>m.id);
 const MANAGER_DEFAULT_MENUS=['input','stok','laba','selisih','histori'];
 
 function getUsers(){
-  try{const d=localStorage.getItem(USERS_KEY);return d?JSON.parse(d):getDefaultUsers();}
-  catch(e){return getDefaultUsers();}
+  try{
+    const d=localStorage.getItem(USERS_KEY);
+    if(!d)return getDefaultUsers();
+    const users=JSON.parse(d);
+    if(!Array.isArray(users)||!users.length)return getDefaultUsers();
+    // MIGRATION: pastikan owner selalu punya akses ke semua menu (termasuk yang baru)
+    let migrated=false;
+    users.forEach(u=>{
+      if(u.role==='owner'){
+        // Owner selalu dapat semua menu terbaru
+        const allIds=ALL_MENUS.map(m=>m.id);
+        const currentMenus=u.menuAccess||[];
+        const missing=allIds.filter(id=>!currentMenus.includes(id));
+        if(missing.length){
+          u.menuAccess=allIds;
+          migrated=true;
+        }
+      }
+    });
+    if(migrated)localStorage.setItem(USERS_KEY,JSON.stringify(users));
+    return users;
+  }catch(e){return getDefaultUsers();}
 }
 function getDefaultUsers(){
   const pw=getPasswords();
@@ -559,6 +620,10 @@ function showApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('main-topbar').style.display='flex';
   document.getElementById('main-layout').style.display='flex';
+  // Update topbar brand
+  const profil=getProfil();
+  const brandEl=document.querySelector('.topbar-brand');
+  if(brandEl)brandEl.innerHTML='<span>SPBU</span> '+esc(profil.nama||'Manager');
   const isOwner=currentUser.role==='owner';
   const badge=document.getElementById('tb-role-badge');
   badge.textContent=isOwner?'👑 Owner':'🔧 '+currentUser.name;
@@ -592,7 +657,7 @@ function buildSidebar(){
       html+=`<a class="nav-item" onclick="showPage('${m}')" href="#" id="nav-${m}"><span class="nav-icon">${def.icon}</span> ${def.label}</a>`;
   });
   html+='<div class="nav-divider"></div><div class="nav-section">Data</div>';
-  const dataMenus=['histori','rekap','harga'];
+  const dataMenus=['histori','rekap','lapkeu','harga'];
   dataMenus.forEach(m=>{
     const def=ALL_MENUS.find(x=>x.id===m);
     if(!def)return;
@@ -691,6 +756,7 @@ function showPage(name){
   else if(name==='selisih')renderSelisihPage(main);
   else if(name==='histori')renderHistoriPage(main);
   else if(name==='rekap')renderRekapPage(main);
+  else if(name==='lapkeu')renderLapKeuPage(main);
   else if(name==='harga')renderHargaPage(main);
   else if(name==='database')renderDBPage(main);
   else if(name==='users')renderUsersPage(main);
@@ -946,7 +1012,7 @@ function renderInputPage(main){
   const y=today.getFullYear(),m=String(today.getMonth()+1).padStart(2,'0'),d=String(today.getDate()).padStart(2,'0');
   if(e('f-tanggal')&&!e('f-tanggal').value)e('f-tanggal').value=`${y}-${m}-${d}`;
   onTgl();
-  renderShifts();
+  renderShifts();calcAll();
   renderBiaya();
 }
 
@@ -977,14 +1043,30 @@ function renderShifts(){
       // Shift Pagi: jika bukan tgl 1, cek histori hari sebelumnya
       const prevDayVal=isPagi&&!tgl1?getPrevDayStock(tgl,b):null;
       const isAwalAuto=isPagi&&!tgl1&&prevDayVal!==null;
-      const awalVal=isAwalAuto?prevDayVal:(!isPagi&&prev?0:(d.awal||0));
+      // Hitung stok awal otomatis dari stok akhir efektif shift sebelumnya
+      let prevShiftVal=0;
+      if(!isPagi&&prev){
+        const pAwal=parseInt((e(`${prev}-awal-${b}`)?.value||'0').replace(/\./g,''))||0;
+        const pJual=parseInt((e(`${prev}-jual-${b}`)?.value||'0').replace(/\./g,''))||0;
+        const pTambah=parseInt((e(`${prev}-tambah-${b}`)?.value||'0').replace(/\./g,''))||0;
+        const pHabis=e(`${prev}-habis-${b}`)?.checked||false;
+        const pTambahTarget=getTambahTarget(prev);
+        const pTambahCur=pTambahTarget==='current'?pTambah:0;
+        const pTambahNext=pTambahTarget==='next'?pTambah:0;
+        const pR=calcRow(pAwal,pJual,pTambahCur,pHabis);
+        prevShiftVal=Math.max(0,pR.stokAkhirEfektif+pTambahNext);
+      }
+      const awalVal=isAwalAuto?prevDayVal:(!isPagi&&prev?prevShiftVal:(d.awal||0));
       const isAuto=(!isPagi&&prev)||isAwalAuto;
       const lock=saved;
       const awalStyle=isAwalAuto?'inp inp-num inp-auto':(isAuto&&!isAwalAuto?'inp inp-num inp-auto':(lock?'inp inp-num':'inp inp-num'));
       const jualStyle=lock?'inp inp-num':'inp inp-num';
       return`<tr id="tr-${sh}-${b}">
         <td><span class="tag ${BT[b]}">${BL[b]}</span></td>
-        <td><input type="text" id="${sh}-awal-${b}" value="${awalVal}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px"></td>
+        <td>
+          <input type="text" id="${sh}-awal-${b}" value="${awalVal}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px">
+          ${isAuto&&!isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:${prevShiftVal>0?'var(--blue)':'var(--red)'};margin-top:2px;white-space:nowrap">↑ stok akhir ${prev?cap(prev):''}: ${fN(prevShiftVal)} ltr</div>`:''}
+        </td>
         <td><input type="text" id="${sh}-jual-${b}" value="${d.jual||0}" class="${jualStyle}" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px"></td>
         <td id="${sh}-catatan-cell-${b}">—</td>
         <td id="${sh}-sel-cell-${b}" style="font-size:11px;min-width:120px">—</td>
@@ -1094,8 +1176,8 @@ function renderShifts(){
   setTimeout(()=>calcAll(),20);
 }
 
-function saveShift(sh){state.shiftSaved[sh]=true;dbSave();toast('Shift '+cap(sh)+' tersimpan dan dikunci ✓');renderShifts();}
-function editShift(sh){state.shiftSaved[sh]=false;dbSave();toast('Shift '+cap(sh)+' dibuka untuk diedit.');renderShifts();}
+function saveShift(sh){state.shiftSaved[sh]=true;dbSave();toast('Shift '+cap(sh)+' tersimpan dan dikunci ✓');renderShifts();calcAll();}
+function editShift(sh){state.shiftSaved[sh]=false;dbSave();toast('Shift '+cap(sh)+' dibuka untuk diedit.');renderShifts();calcAll();}
 
 function confirmResetShift(sh){
   if(confirm('Reset data shift '+cap(sh)+'? Semua nilai akan menjadi 0.')){
@@ -1158,7 +1240,12 @@ function propagate(fromSh,toSh){
     const jual=gv(`${fromSh}-jual-${b}`);const tambah=gv(`${fromSh}-tambah-${b}`);
     const r=calcRow(awal,jual,tambah,habis);
     const toEl=e(`${toSh}-awal-${b}`);
-    if(toEl&&toEl.readOnly&&!state.shiftSaved[toSh])toEl.value=Math.max(0,r.stokAkhirEfektif);
+    if(toEl&&toEl.readOnly&&!state.shiftSaved[toSh]){
+      const nilaiAwal=Math.max(0,r.stokAkhirEfektif);
+      toEl.value=nilaiAwal;
+      const infoEl=e(`${toSh}-awal-info-${b}`);
+      if(infoEl){infoEl.textContent=`↑ stok akhir ${cap(fromSh)}: ${fN(nilaiAwal)} ltr`;infoEl.style.color=nilaiAwal>0?'var(--blue)':'var(--red)';}
+    }
   });calcShift(toSh);
 }
 
@@ -1226,7 +1313,10 @@ function propagate(fromSh,toSh){
     const toEl=e(`${toSh}-awal-${b}`);
     if(toEl&&toEl.readOnly&&!state.shiftSaved[toSh]){
       // Stok awal shift berikutnya = stok akhir fromSh + tambahan yang ditujukan ke shift berikutnya
-      toEl.value=Math.max(0,r.stokAkhirEfektif+tambahForNext);
+      const nilaiAwal=Math.max(0,r.stokAkhirEfektif+tambahForNext);
+      toEl.value=nilaiAwal;
+      const infoEl=e(`${toSh}-awal-info-${b}`);
+      if(infoEl){infoEl.textContent=`↑ stok akhir ${cap(fromSh)}: ${fN(nilaiAwal)} ltr`;infoEl.style.color=nilaiAwal>0?'var(--blue)':'var(--red)';}
     }
   });calcShift(toSh);
 }
@@ -1702,8 +1792,14 @@ function renderRekapPage(main){
   const chartLaba=last30.map(d=>d.labaBersih);
   const chartOmzet=last30.map(d=>d.totalOmzet);
 
-  // BBM volume pie
-  const bbmTotalVol=BBM.map(b=>allData.summary.bbmVol[b]);
+  // BBM volume pie — hitung langsung dari savedData
+  const bbmTotalVol=BBM.map(b=>{
+    let vol=0;
+    state.savedData.forEach(d=>{
+      d.shifts.forEach(sh=>{const sd=d.shiftData[sh]?.[b]||{};vol+=(sd.jual||0)+(sd.plus||0);});
+    });
+    return vol;
+  });
 
   // Per-BBM laba data (all time)
   const bbmLabaAll=BBM.map(b=>{
@@ -1887,8 +1983,8 @@ function renderRekapPage(main){
         </tr></thead>
         <tbody>
         ${BBM.map(b=>{
-          const vol=allData.summary.bbmVol[b]||0;
-          const totalVol=allData.summary.jual||1;
+          let vol=0;state.savedData.forEach(d=>{d.shifts.forEach(sh=>{const sd=d.shiftData[sh]?.[b]||{};vol+=(sd.jual||0)+(sd.plus||0);});});
+          const totalVol=bbmTotalVol.reduce((s,v)=>s+v,0)||1;
           const pct=(vol/totalVol*100).toFixed(1);
           let omzBBM=0,labBBM=0,lossBBM=0,plusBBM=0;
           state.savedData.forEach(d=>{
@@ -2047,38 +2143,26 @@ function exportRekapCSV(){
 }
 
 function printRekap(){
-  const metrics=e('rekap-metrics');
   const tabel=e('rekap-tabel');
-  if(!metrics||!tabel){toast('Tidak ada data untuk dicetak.');return;}
-  const w=window.open('','_blank');
+  if(!tabel){toast('Tidak ada data untuk dicetak.');return;}
   const now=new Date().toLocaleString('id-ID');
-  w.document.write(`<!DOCTYPE html><html><head><title>Rekap SPBU</title>
-  <style>
-    body{font-family:sans-serif;font-size:12px;padding:20px;color:#1A1916}
-    h1{font-size:18px;margin-bottom:4px}
-    .sub{color:#6B6760;margin-bottom:20px;font-size:12px}
-    .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
-    .metric{border:1px solid #E4E0D8;border-radius:8px;padding:12px}
-    .metric-label{font-size:10px;text-transform:uppercase;color:#A09C95;font-weight:700;margin-bottom:4px}
-    .metric-value{font-size:18px;font-weight:700}
-    table{width:100%;border-collapse:collapse;font-size:11px;margin-top:12px}
-    th{background:#F1EFE9;padding:6px 8px;text-align:right;border-bottom:2px solid #E4E0D8;font-size:10px;text-transform:uppercase}
-    th:first-child{text-align:left}
-    td{padding:5px 8px;text-align:right;border-bottom:1px solid #E4E0D8}
-    td:first-child{text-align:left;font-weight:600}
-    tfoot td{font-weight:700;background:#F1EFE9;border-top:2px solid #E4E0D8}
-    @media print{body{padding:10px}}
-  </style></head><body>
-  <h1>Laporan Rekap SPBU</h1>
-  <div class="sub">Dicetak: ${now} &nbsp;|&nbsp; Total data: ${state.savedData.length} hari</div>
-  <div class="g4">
-    <div class="metric"><div class="metric-label">Total Hari</div><div class="metric-value">${state.savedData.length}</div></div>
-    <div class="metric"><div class="metric-label">Total Omzet</div><div class="metric-value">${fR(allData.summary.omzet)}</div></div>
-    <div class="metric"><div class="metric-label">Total Laba Kotor</div><div class="metric-value">${fR(allData.summary.labaKotor)}</div></div>
-    <div class="metric"><div class="metric-label">Total Laba Bersih</div><div class="metric-value">${fR(allData.summary.labaBersih)}</div></div>
-  </div>
-  ${tabel.innerHTML}
-  </body></html>`);
+  const n=state.savedData.length;
+  const ad=getRekapData('harian',null);
+  const s=ad.summary;
+  const profil=getProfil();
+  const css='*{box-sizing:border-box;margin:0;padding:0}body{font-family:sans-serif;font-size:12px;padding:20px;color:#1A1916}h1{font-size:18px;margin-bottom:2px}h2{font-size:13px;font-weight:400;color:#6B6760;margin-bottom:4px}.sub{color:#6B6760;margin-bottom:20px;font-size:11px}.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.metric{border:1px solid #E4E0D8;border-radius:8px;padding:12px}.metric-label{font-size:10px;text-transform:uppercase;color:#A09C95;font-weight:700;margin-bottom:4px}.metric-value{font-size:16px;font-weight:700}table{width:100%;border-collapse:collapse;font-size:11px;margin-top:12px}th{background:#F1EFE9;padding:6px 8px;text-align:right;border-bottom:2px solid #E4E0D8;font-size:10px;text-transform:uppercase}th:first-child{text-align:left}td{padding:5px 8px;text-align:right;border-bottom:1px solid #E4E0D8}td:first-child{text-align:left;font-weight:600}tfoot td{font-weight:700;background:#F1EFE9;border-top:2px solid #E4E0D8}@media print{body{padding:10px}}';
+  let body='<h1>'+(profil.nama||'SPBU')+'</h1>';
+  body+='<h2>No. SPBU: '+(profil.noSpbu||'-')+'</h2>';
+  body+='<div class="sub">Laporan Rekap &nbsp;|&nbsp; Dicetak: '+now+' &nbsp;|&nbsp; Total data: '+n+' hari</div>';
+  body+='<div class="g4">';
+  body+='<div class="metric"><div class="metric-label">Total Hari</div><div class="metric-value">'+n+'</div></div>';
+  body+='<div class="metric"><div class="metric-label">Total Omzet</div><div class="metric-value">'+fR(s.omzet)+'</div></div>';
+  body+='<div class="metric"><div class="metric-label">Total Laba Kotor</div><div class="metric-value">'+fR(s.labaKotor)+'</div></div>';
+  body+='<div class="metric"><div class="metric-label">Total Laba Bersih</div><div class="metric-value">'+fR(s.labaBersih)+'</div></div>';
+  body+='</div>';
+  body+=tabel.innerHTML;
+  const w=window.open('','_blank');
+  w.document.write('<!DOCTYPE html><html><head><title>Rekap SPBU</title><style>'+css+'</style></head><body>'+body+'</body></html>');
   w.document.close();
   setTimeout(()=>w.print(),500);
 }
@@ -2284,8 +2368,434 @@ function saveUser(existingId){
   renderUsersPage(e('main-content'));
 }
 
+// ════════════════════════════════════════════════════════════
+// PAGE: LAPORAN KEUANGAN
+// ════════════════════════════════════════════════════════════
+let lapKeuMode='bulanan';
+
+function getLapKeuData(mode, filterVal){
+  if(!state.savedData.length) return null;
+
+  const all=[...state.savedData].sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+
+  // Filter berdasarkan mode
+  let records=all;
+  if(mode==='bulanan'&&filterVal){
+    records=all.filter(d=>d.tanggal.slice(0,7)===filterVal);
+  }else if(mode==='custom'&&filterVal?.from&&filterVal?.to){
+    records=all.filter(d=>d.tanggal>=filterVal.from&&d.tanggal<=filterVal.to);
+  }else if(mode==='tahunan'&&filterVal){
+    records=all.filter(d=>d.tanggal.slice(0,4)===filterVal);
+  }
+
+  if(!records.length) return null;
+
+  // ── Pendapatan Usaha ──
+  // Omzet per BBM (harga jual × volume)
+  const pendapatanBBM={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+  let totalPendapatan=0;
+
+  // ── Beban Pokok Penjualan (HPP) ──
+  const hppBBM={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+  let totalHPP=0;
+
+  // ── Beban Operasional (non-gaji) ──
+  const bebanOpDetail={listrik:0,perawatan:0,administrasi:0,lainnya:0};
+  let totalBebanOp=0;
+
+  // ── Beban Gaji ──
+  let totalGaji=0;
+
+  // ── Losses & Plus ──
+  let totalLossesRp=0, totalPlusRp=0;
+  const lossesBBM={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+  const plusBBM={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+  let totalLossesLtr=0,totalPlusLtr=0;
+
+  records.forEach(d=>{
+    const hSnap=d.hargaSnapshot||null;
+    BBM.forEach(b=>{
+      const hj=hSnap?hSnap[b]:getHargaPadaTanggal(d.tanggal,b).hj;
+      const hpp=hSnap?hSnap['hpp_'+b]:getHargaPadaTanggal(d.tanggal,b).hpp;
+      let volJual=0,volLoss=0,volPlus=0;
+      d.shifts.forEach(sh=>{
+        const sd=d.shiftData[sh]?.[b]||{};
+        volJual+=(sd.jual||0)+(sd.plus||0);
+        volLoss+=sd.losses||0;
+        volPlus+=sd.plus||0;
+      });
+      pendapatanBBM[b]+=volJual*hj;
+      hppBBM[b]+=volJual*hpp;
+      lossesBBM[b]+=volLoss*hj;
+      plusBBM[b]+=volPlus*hj;
+      totalLossesLtr+=volLoss;
+      totalPlusLtr+=volPlus;
+    });
+
+    // Biaya dari biayaItems per record
+    (d.biayaItems||[]).forEach(item=>{
+      if(item.cat==='gaji'){
+        totalGaji+=item.nom;
+      }else{
+        bebanOpDetail[item.cat]=(bebanOpDetail[item.cat]||0)+item.nom;
+        totalBebanOp+=item.nom;
+      }
+    });
+
+    totalLossesRp+=d.tLRp||0;
+    totalPlusRp+=d.tPRp||0;
+  });
+
+  BBM.forEach(b=>{totalPendapatan+=pendapatanBBM[b];totalHPP+=hppBBM[b];});
+  const totalBebanTotal=totalGaji+totalBebanOp;
+
+  // ── Laba Kotor (Gross Profit) ──
+  const labaKotor=totalPendapatan-totalHPP;
+
+  // ── Laba Operasional (sebelum losses/plus) ──
+  const labaOperasional=labaKotor-totalBebanTotal;
+
+  // ── Laba Bersih (setelah losses & plus) ──
+  const labaBersih=labaOperasional-totalLossesRp+totalPlusRp;
+
+  // ── Dividen (10% dari laba bersih) ──
+  const dividen=Math.max(0,labaBersih*0.10);
+
+  // ── Laba Ditahan (setelah dividen) ──
+  const labaDitahan=labaBersih-dividen;
+
+  return{
+    records,periode:{mode,filterVal},
+    pendapatan:{detail:pendapatanBBM,total:totalPendapatan},
+    hpp:{detail:hppBBM,total:totalHPP},
+    labaKotor,
+    bebanGaji:totalGaji,
+    bebanOp:{detail:bebanOpDetail,total:totalBebanOp},
+    totalBeban:totalBebanTotal,
+    labaOperasional,
+    losses:{detail:lossesBBM,ltr:totalLossesLtr,rp:totalLossesRp},
+    plus:{detail:plusBBM,ltr:totalPlusLtr,rp:totalPlusRp},
+    labaBersih,
+    dividen,
+    labaDitahan,
+    hariCount:records.length,
+  };
+}
+
+function renderLapKeuPage(main){
+  if(!state.savedData.length){
+    main.innerHTML='<div class="page-header"><div class="page-title">Laporan Keuangan</div></div><div class="card"><div class="empty-state">Belum ada data untuk ditampilkan.</div></div>';
+    return;
+  }
+
+  const bulanList=[...new Set(state.savedData.map(d=>d.tanggal.slice(0,7)))].sort().reverse();
+  const tahunList=[...new Set(state.savedData.map(d=>d.tanggal.slice(0,4)))].sort().reverse();
+  const selBulan=e('lk-bulan')?e('lk-bulan').value:(bulanList[0]||'');
+  const selTahun=e('lk-tahun')?e('lk-tahun').value:(tahunList[0]||'');
+  const selFrom=e('lk-from')?e('lk-from').value:'';
+  const selTo=e('lk-to')?e('lk-to').value:'';
+
+  let filterVal=null;
+  if(lapKeuMode==='bulanan')filterVal=selBulan;
+  else if(lapKeuMode==='tahunan')filterVal=selTahun;
+  else if(lapKeuMode==='custom')filterVal={from:selFrom,to:selTo};
+
+  const d=getLapKeuData(lapKeuMode,filterVal);
+
+  const bnArr=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const bulanLabel=v=>{if(!v)return'';const p=v.split('-');return(bnArr[parseInt(p[1])-1]||p[1])+' '+p[0];};
+  const periodeLabel=lapKeuMode==='bulanan'?bulanLabel(selBulan):lapKeuMode==='tahunan'?'Tahun '+selTahun:(selFrom&&selTo?selFrom+' s/d '+selTo:'Semua');
+
+  if(!d){
+    main.innerHTML='<div class="page-header"><div class="page-title">Laporan Keuangan</div></div><div class="card"><div class="empty-state">Tidak ada data untuk periode yang dipilih.</div></div>';
+    return;
+  }
+
+  const grossMarginPct=d.pendapatan.total>0?(d.labaKotor/d.pendapatan.total*100):0;
+  const opMarginPct=d.pendapatan.total>0?(d.labaOperasional/d.pendapatan.total*100):0;
+  const netMarginPct=d.pendapatan.total>0?(d.labaBersih/d.pendapatan.total*100):0;
+
+  // Helper: format Rp dengan tanda kurung untuk negatif
+  const fmtRp=v=>v===null||v===undefined?'—':v<0?'('+fRF(Math.abs(v))+')':fRF(v);
+
+  // Build rows step by step
+  let rows='';
+
+  // Helper builders
+  const subhead=label=>'<tr class="lk-section"><td colspan="2">'+label+'</td></tr>';
+  const lineItem=(label,val,color,indent)=>{
+    indent=indent||0;
+    color=color||'';
+    const colorStyle=color==='pos'?'color:var(--green)':color==='neg'?'color:var(--red)':color==='neu'?'color:var(--purple)':'';
+    return '<tr class="lk-item"><td style="padding-left:'+(20+indent*16)+'px;'+colorStyle+'">'+label+'</td><td class="lk-num" style="'+colorStyle+'">'+fmtRp(val)+'</td></tr>';
+  };
+  const totalLine=(label,val,color,kind)=>{
+    color=color||'';
+    kind=kind||'single';
+    const colorStyle=color==='pos'?'color:var(--green)':color==='neg'?'color:var(--red)':color==='neu'?'color:var(--purple)':'';
+    return '<tr class="lk-total lk-'+kind+'"><td style="padding-left:16px;font-weight:700;'+colorStyle+'">'+label+'</td><td class="lk-num" style="font-weight:700;'+colorStyle+'">'+fmtRp(val)+'</td></tr>';
+  };
+  const marginLine=(label,pct,color)=>{
+    color=color||'';
+    const colorStyle=color==='pos'?'color:var(--green)':color==='neg'?'color:var(--red)':'color:var(--text2)';
+    return '<tr class="lk-margin"><td style="padding-left:36px;font-style:italic;'+colorStyle+'">'+label+'</td><td class="lk-num" style="font-style:italic;font-size:12px;'+colorStyle+'">'+pct.toFixed(2)+'%</td></tr>';
+  };
+  const sep='<tr class="lk-sep"><td colspan="2"></td></tr>';
+
+  // A. PENDAPATAN
+  rows+=subhead('A. PENDAPATAN USAHA');
+  BBM.forEach(b=>{rows+=lineItem('Penjualan '+BL[b],d.pendapatan.detail[b],'',1);});
+  rows+=totalLine('Total Pendapatan Usaha',d.pendapatan.total,'pos','single');
+  rows+=sep;
+
+  // B. HPP
+  rows+=subhead('B. BEBAN POKOK PENJUALAN (HPP)');
+  BBM.forEach(b=>{rows+=lineItem('HPP '+BL[b],-d.hpp.detail[b],'neg',1);});
+  rows+=totalLine('Total Beban Pokok',-d.hpp.total,'neg','single');
+  rows+=totalLine('LABA KOTOR',d.labaKotor,d.labaKotor>=0?'pos':'neg','double');
+  rows+=marginLine('Margin Laba Kotor',grossMarginPct,d.labaKotor>=0?'pos':'neg');
+  rows+=sep;
+
+  // C. BEBAN OPERASIONAL
+  rows+=subhead('C. BEBAN OPERASIONAL');
+  rows+=subhead('C.1 Beban Gaji & Upah');
+  rows+=lineItem('Gaji / Upah Karyawan',-d.bebanGaji,'neg',1);
+  rows+=totalLine('Subtotal Beban Gaji',-d.bebanGaji,'neg','single');
+
+  rows+=subhead('C.2 Beban Operasional Lainnya');
+  rows+=lineItem('Listrik & Air',-d.bebanOp.detail.listrik,'neg',1);
+  rows+=lineItem('Perawatan & Pemeliharaan',-d.bebanOp.detail.perawatan,'neg',1);
+  rows+=lineItem('Administrasi & Umum',-d.bebanOp.detail.administrasi,'neg',1);
+  rows+=lineItem('Beban Lain-lain',-d.bebanOp.detail.lainnya,'neg',1);
+  const subtotalOpLain=d.bebanOp.detail.listrik+d.bebanOp.detail.perawatan+d.bebanOp.detail.administrasi+d.bebanOp.detail.lainnya;
+  rows+=totalLine('Subtotal Beban Op. Lainnya',-subtotalOpLain,'neg','single');
+
+  rows+=totalLine('Total Beban Operasional',-d.totalBeban,'neg','double');
+  rows+=totalLine('LABA OPERASIONAL',d.labaOperasional,d.labaOperasional>=0?'pos':'neg','double');
+  rows+=marginLine('Margin Laba Operasional',opMarginPct,d.labaOperasional>=0?'pos':'neg');
+  rows+=sep;
+
+  // D. PENYESUAIAN STOK
+  rows+=subhead('D. PENYESUAIAN STOK (LOSSES & PLUS)');
+  rows+=subhead('D.1 Kerugian Losses (Susut Stok)');
+  let adaLosses=false;
+  BBM.forEach(b=>{
+    if(d.losses.detail[b]>0){
+      adaLosses=true;
+      rows+=lineItem('Losses '+BL[b],-d.losses.detail[b],'neg',1);
+    }
+  });
+  if(!adaLosses)rows+='<tr class="lk-item"><td colspan="2" style="padding-left:36px;color:var(--text3);font-style:italic">Tidak ada losses</td></tr>';
+  rows+=totalLine('Total Losses ('+fN(d.losses.ltr)+' ltr)',-d.losses.rp,'neg','single');
+
+  rows+=subhead('D.2 Keuntungan Plus (Surplus Stok)');
+  let adaPlus=false;
+  BBM.forEach(b=>{
+    if(d.plus.detail[b]>0){
+      adaPlus=true;
+      rows+=lineItem('Plus '+BL[b],d.plus.detail[b],'neu',1);
+    }
+  });
+  if(!adaPlus)rows+='<tr class="lk-item"><td colspan="2" style="padding-left:36px;color:var(--text3);font-style:italic">Tidak ada plus</td></tr>';
+  rows+=totalLine('Total Plus ('+fN(d.plus.ltr)+' ltr)',d.plus.rp,'neu','single');
+
+  rows+=totalLine('LABA (RUGI) BERSIH',d.labaBersih,d.labaBersih>=0?'pos':'neg','double');
+  rows+=marginLine('Net Profit Margin',netMarginPct,d.labaBersih>=0?'pos':'neg');
+  rows+=sep;
+
+  // E. DISTRIBUSI LABA
+  rows+=subhead('E. DISTRIBUSI LABA');
+  if(d.labaBersih>0){
+    rows+=lineItem('Laba Bersih (Basis Distribusi)',d.labaBersih,'pos',0);
+    rows+=lineItem('Dividen (10%)',-d.dividen,'neg',1);
+    rows+=lineItem('Laba Ditahan (90%)',d.labaDitahan,'neu',1);
+    rows+=totalLine('Total Alokasi Laba',d.labaBersih,'pos','single');
+  }else{
+    rows+='<tr class="lk-item"><td colspan="2" style="padding-left:36px;color:var(--text3);font-style:italic">Tidak ada distribusi — usaha mengalami kerugian</td></tr>';
+  }
+
+  // KPI Cards
+  let kpiHTML='<div class="dash-kpi" style="margin-bottom:20px">';
+  kpiHTML+='<div class="kpi-card kpi-blue"><span class="kpi-icon">💵</span><div class="kpi-label">Pendapatan</div><div class="kpi-value">'+fR(d.pendapatan.total)+'</div><div class="kpi-sub">'+d.hariCount+' hari</div></div>';
+  kpiHTML+='<div class="kpi-card kpi-green"><span class="kpi-icon">📊</span><div class="kpi-label">Laba Kotor</div><div class="kpi-value kv-green">'+fR(d.labaKotor)+'</div><div class="kpi-sub">'+grossMarginPct.toFixed(1)+'%</div></div>';
+  const opCls=d.labaOperasional>=0?'kpi-green':'kpi-red';
+  const opVcls=d.labaOperasional>=0?'kv-green':'kv-red';
+  kpiHTML+='<div class="kpi-card '+opCls+'"><span class="kpi-icon">🏭</span><div class="kpi-label">Laba Operasional</div><div class="kpi-value '+opVcls+'">'+fR(d.labaOperasional)+'</div><div class="kpi-sub">'+opMarginPct.toFixed(1)+'%</div></div>';
+  const lbCls=d.labaBersih>=0?'kpi-green':'kpi-red';
+  const lbVcls=d.labaBersih>=0?'kv-green':'kv-red';
+  kpiHTML+='<div class="kpi-card '+lbCls+'"><span class="kpi-icon">💰</span><div class="kpi-label">Laba Bersih</div><div class="kpi-value '+lbVcls+'">'+fR(d.labaBersih)+'</div><div class="kpi-sub">'+netMarginPct.toFixed(1)+'%</div></div>';
+  kpiHTML+='<div class="kpi-card kpi-amber"><span class="kpi-icon">💎</span><div class="kpi-label">Dividen 10%</div><div class="kpi-value">'+fR(d.dividen)+'</div><div class="kpi-sub">'+(d.labaBersih<0?'rugi':'dari laba bersih')+'</div></div>';
+  const ldCls=d.labaDitahan>=0?'kv-green':'kv-red';
+  kpiHTML+='<div class="kpi-card kpi-purple"><span class="kpi-icon">🏦</span><div class="kpi-label">Laba Ditahan</div><div class="kpi-value '+ldCls+'">'+fR(d.labaDitahan)+'</div><div class="kpi-sub">90%</div></div>';
+  kpiHTML+='</div>';
+
+  // Filter bar
+  let filterHTML='<div class="card" style="padding:14px 20px;margin-bottom:16px"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+  filterHTML+='<span style="font-size:12px;font-weight:700;color:var(--text2)">PERIODE:</span><div class="snav" style="margin:0">';
+  ['bulanan','tahunan','custom'].forEach(m=>{
+    const lbl=m==='bulanan'?'Bulanan':m==='tahunan'?'Tahunan':'Kustom';
+    const act=lapKeuMode===m?' active':'';
+    filterHTML+='<button class="snav-btn'+act+'" onclick="lapKeuMode=\''+m+'\';renderLapKeuPage(e(\'main-content\'))">'+lbl+'</button>';
+  });
+  filterHTML+='</div>';
+  if(lapKeuMode==='bulanan'){
+    filterHTML+='<select class="inp" id="lk-bulan" onchange="renderLapKeuPage(e(\'main-content\'))" style="width:140px;padding:5px 8px;font-size:12px">';
+    bulanList.forEach(b=>{filterHTML+='<option value="'+b+'"'+(b===selBulan?' selected':'')+'>'+bulanLabel(b)+'</option>';});
+    filterHTML+='</select>';
+  }
+  if(lapKeuMode==='tahunan'){
+    filterHTML+='<select class="inp" id="lk-tahun" onchange="renderLapKeuPage(e(\'main-content\'))" style="width:120px;padding:5px 8px;font-size:12px">';
+    tahunList.forEach(t=>{filterHTML+='<option value="'+t+'"'+(t===selTahun?' selected':'')+'>Tahun '+t+'</option>';});
+    filterHTML+='</select>';
+  }
+  if(lapKeuMode==='custom'){
+    filterHTML+='<input type="date" class="inp" id="lk-from" value="'+selFrom+'" onchange="renderLapKeuPage(e(\'main-content\'))" style="width:130px;padding:5px 8px;font-size:12px">';
+    filterHTML+='<span style="font-size:12px;color:var(--text2)">s/d</span>';
+    filterHTML+='<input type="date" class="inp" id="lk-to" value="'+selTo+'" onchange="renderLapKeuPage(e(\'main-content\'))" style="width:130px;padding:5px 8px;font-size:12px">';
+  }
+  filterHTML+='<button class="btn btn-ghost btn-sm" onclick="printLapKeu()" style="margin-left:auto">🖨 Print</button>';
+  filterHTML+='<button class="btn btn-primary btn-sm" onclick="exportLapKeuCSV()">📥 Export CSV</button>';
+  filterHTML+='</div></div>';
+
+  // Header laporan formal
+  const tglCetak=new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const profil=getProfil();
+  let kopHTML='<div style="text-align:center;padding:24px 16px;border-bottom:3px solid var(--text);background:var(--surface2);border-radius:var(--radius-lg) var(--radius-lg) 0 0">';
+  kopHTML+='<div style="font-size:11px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--text3);margin-bottom:6px">Laporan Keuangan</div>';
+  kopHTML+='<div style="font-size:22px;font-weight:800;letter-spacing:.02em;color:var(--text)">LABA RUGI USAHA</div>';
+  kopHTML+='<div style="font-size:14px;font-weight:700;color:var(--text);margin-top:6px">'+esc(profil.nama||'SPBU')+'</div>';
+  if(profil.noSpbu)kopHTML+='<div style="font-size:12px;color:var(--text2);margin-top:2px">No. SPBU Pertamina: <strong>'+esc(profil.noSpbu)+'</strong></div>';
+  if(profil.alamat)kopHTML+='<div style="font-size:11px;color:var(--text3);margin-top:2px">'+esc(profil.alamat)+'</div>';
+  kopHTML+='<div style="height:1px;background:var(--border);margin:12px auto;max-width:300px"></div>';
+  kopHTML+='<div style="font-size:13px;color:var(--text)"><strong>Periode:</strong> '+periodeLabel+'</div>';
+  kopHTML+='<div style="font-size:11px;color:var(--text3);margin-top:4px">'+d.hariCount+' hari operasi · Dicetak: '+tglCetak+'</div>';
+  kopHTML+='</div>';
+
+  // Final HTML
+  let finalHTML='';
+  finalHTML+='<div class="page-header"><div class="page-title">📑 Laporan Keuangan</div><div class="page-sub">Laporan Laba Rugi Usaha SPBU</div></div>';
+  finalHTML+=filterHTML;
+  finalHTML+=kpiHTML;
+  finalHTML+='<div class="card" id="lapkeu-print-area" style="padding:0;overflow:hidden">';
+  finalHTML+=kopHTML;
+  finalHTML+='<table class="lk-tbl">'+rows+'</table>';
+  finalHTML+='<div style="margin:0;padding:14px 18px;background:var(--blue-bg);border-top:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.6">';
+  finalHTML+='<strong style="color:var(--blue)">📌 Catatan:</strong> ';
+  finalHTML+='Losses = susut stok BBM (kerugian). Plus = surplus stok (keuntungan tambahan). ';
+  finalHTML+='Dividen 10% dari laba bersih, sisa 90% adalah laba ditahan untuk reinvestasi.';
+  finalHTML+='</div>';
+  finalHTML+='</div>';
+
+  // Charts section
+  finalHTML+='<div class="g2">';
+  finalHTML+='<div class="card"><div class="card-title">📊 Komposisi Pendapatan per BBM</div><div style="position:relative;height:220px"><canvas id="lk-chart-pendapatan"></canvas></div></div>';
+  finalHTML+='<div class="card"><div class="card-title">📊 Waterfall Laba Rugi</div><div style="position:relative;height:220px"><canvas id="lk-chart-waterfall"></canvas></div></div>';
+  finalHTML+='</div>';
+
+  // Rasio
+  finalHTML+='<div class="card"><div class="card-title">📐 Analisis Rasio Keuangan</div><div class="g4">';
+  const ratios=[
+    {l:'Gross Profit Margin',v:grossMarginPct.toFixed(2)+'%',s:'Laba Kotor / Pendapatan',c:d.labaKotor>=0?'c-green':'c-red'},
+    {l:'Operating Margin',v:opMarginPct.toFixed(2)+'%',s:'Laba Op. / Pendapatan',c:d.labaOperasional>=0?'c-green':'c-red'},
+    {l:'Net Profit Margin',v:netMarginPct.toFixed(2)+'%',s:'Laba Bersih / Pendapatan',c:d.labaBersih>=0?'c-green':'c-red'},
+    {l:'Beban / Pendapatan',v:d.pendapatan.total>0?((d.totalBeban/d.pendapatan.total)*100).toFixed(2)+'%':'—',s:'Total Beban / Pendapatan',c:''},
+    {l:'HPP Ratio',v:d.pendapatan.total>0?((d.hpp.total/d.pendapatan.total)*100).toFixed(2)+'%':'—',s:'HPP / Pendapatan',c:''},
+    {l:'Losses Ratio',v:d.pendapatan.total>0?((d.losses.rp/d.pendapatan.total)*100).toFixed(2)+'%':'—',s:'Losses / Pendapatan',c:d.losses.rp>0?'c-red':''},
+    {l:'Laba per Hari',v:d.hariCount>0?fR(Math.round(d.labaBersih/d.hariCount)):'—',s:'Rata-rata',c:d.labaBersih>=0?'c-green':'c-red'},
+    {l:'Dividen per Hari',v:d.hariCount>0&&d.dividen>0?fR(Math.round(d.dividen/d.hariCount)):'—',s:'Rata-rata',c:''},
+  ];
+  ratios.forEach(r=>{
+    finalHTML+='<div class="metric"><div class="metric-label">'+r.l+'</div><div class="metric-value '+r.c+'">'+r.v+'</div><div class="metric-sub">'+r.s+'</div></div>';
+  });
+  finalHTML+='</div></div>';
+
+  main.innerHTML=finalHTML;
+
+  // Render charts
+  setTimeout(()=>{
+    const ctx1=e('lk-chart-pendapatan');
+    if(ctx1&&window.Chart){
+      new Chart(ctx1,{type:'doughnut',data:{
+        labels:BBM.map(b=>BL[b]),
+        datasets:[{data:BBM.map(b=>d.pendapatan.detail[b]),backgroundColor:['#2D6A2D','#185FA5','#854F0B','#534AB7'],borderWidth:2}]
+      },options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:11}}}}}});
+    }
+    const ctx2=e('lk-chart-waterfall');
+    if(ctx2&&window.Chart){
+      const labels=['Pendapatan','HPP','Laba Kotor','Beban','Laba Op.','Losses','Plus','Laba Bersih'];
+      const values=[d.pendapatan.total,-d.hpp.total,d.labaKotor,-d.totalBeban,d.labaOperasional,-d.losses.rp,d.plus.rp,d.labaBersih];
+      const colors=values.map(v=>v>=0?'rgba(45,106,45,.75)':'rgba(163,45,45,.75)');
+      new Chart(ctx2,{type:'bar',data:{labels:labels,datasets:[{label:'Nilai',data:values,backgroundColor:colors,borderRadius:4,borderSkipped:false}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+        scales:{y:{ticks:{callback:v=>fR(v),font:{size:9}}},x:{ticks:{font:{size:9}}}}}});
+    }
+  },100);
+}
+
+function printLapKeu(){
+  const area=e('lapkeu-print-area');
+  if(!area){toast('Tidak ada laporan untuk dicetak.');return;}
+  const w=window.open('','_blank');
+  const css='*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:11px;padding:20px;color:#1A1916;background:#fff}.lk-tbl{width:100%;border-collapse:collapse;font-size:11px}.lk-tbl td{padding:6px 14px;vertical-align:middle}.lk-num{text-align:right;font-family:monospace}.lk-section td{background:#1A1916;color:#fff;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:7px 14px}.lk-item td{border-bottom:1px solid #E4E0D8}.lk-total td{font-weight:700;border-top:1.5px solid #1A1916;border-bottom:1px solid #E4E0D8;background:#F1EFE9}.lk-total.lk-double td{border-top:2.5px double #1A1916;border-bottom:2.5px double #1A1916;background:#FAF5E8}.lk-margin td{font-size:10px;font-style:italic;border-bottom:1px solid #E4E0D8}.lk-sep td{height:6px}@media print{body{padding:10px}}';
+  w.document.write('<!DOCTYPE html><html><head><title>Laporan Keuangan SPBU</title><style>'+css+'</style></head><body>'+area.innerHTML+'</body></html>');
+  w.document.close();
+  setTimeout(()=>w.print(),500);
+}
+
+
+function exportLapKeuCSV(){
+  const selBulan=e('lk-bulan')?e('lk-bulan').value:'';
+  const selTahun=e('lk-tahun')?e('lk-tahun').value:'';
+  const selFrom=e('lk-from')?e('lk-from').value:'';
+  const selTo=e('lk-to')?e('lk-to').value:'';
+  let filterVal=null;
+  if(lapKeuMode==='bulanan')filterVal=selBulan;
+  else if(lapKeuMode==='tahunan')filterVal=selTahun;
+  else if(lapKeuMode==='custom')filterVal={from:selFrom,to:selTo};
+  const d=getLapKeuData(lapKeuMode,filterVal);
+  if(!d){toast('Tidak ada data.');return;}
+  const rows=[
+    ['LAPORAN KEUANGAN SPBU',''],
+    ['Periode',lapKeuMode==='bulanan'?selBulan:lapKeuMode==='tahunan'?selTahun:selFrom+' s/d '+selTo],
+    ['Jumlah Hari Operasi',d.hariCount],['',''],
+    ['A. PENDAPATAN USAHA',''],
+    ...BBM.map(b=>['Penjualan '+BL[b],d.pendapatan.detail[b]]),
+    ['Total Pendapatan',d.pendapatan.total],['',''],
+    ['B. BEBAN POKOK PENJUALAN',''],
+    ...BBM.map(b=>['HPP '+BL[b],-d.hpp.detail[b]]),
+    ['Total HPP',-d.hpp.total],
+    ['LABA KOTOR',d.labaKotor],['',''],
+    ['C. BEBAN OPERASIONAL',''],
+    ['Gaji/Upah',-d.bebanGaji],
+    ['Listrik & Air',-d.bebanOp.detail.listrik],
+    ['Perawatan',-d.bebanOp.detail.perawatan],
+    ['Administrasi',-d.bebanOp.detail.administrasi],
+    ['Lain-lain',-d.bebanOp.detail.lainnya],
+    ['Total Beban',-d.totalBeban],
+    ['LABA OPERASIONAL',d.labaOperasional],['',''],
+    ['D. PENYESUAIAN STOK',''],
+    ['Kerugian Losses',-d.losses.rp],
+    ['Keuntungan Plus',d.plus.rp],
+    ['LABA BERSIH',d.labaBersih],['',''],
+    ['E. DISTRIBUSI LABA',''],
+    ['Dividen (10%)',-d.dividen],
+    ['Laba Ditahan (90%)',d.labaDitahan],['',''],
+    ['RASIO KEUANGAN',''],
+    ['Gross Margin %',d.pendapatan.total>0?(d.labaKotor/d.pendapatan.total*100).toFixed(2)+'%':''],
+    ['Operating Margin %',d.pendapatan.total>0?(d.labaOperasional/d.pendapatan.total*100).toFixed(2)+'%':''],
+    ['Net Margin %',d.pendapatan.total>0?(d.labaBersih/d.pendapatan.total*100).toFixed(2)+'%':''],
+  ];
+  const csv=rows.map(r=>r.map(v=>typeof v==='string'&&v.includes(',')?`"${v}"`:v).join(',')).join('\n');
+  const blob=new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;
+  a.download=`lapkeu_spbu_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();URL.revokeObjectURL(url);
+  toast('✓ Laporan keuangan berhasil diunduh!');
+}
+
 function renderHargaPage(main){
-  const rows=BBM.map(b=>{const hj=state.harga[b],hpp=state.harga['hpp_'+b],m=hj-hpp;const pct=hj>0?(m/hj*100):0;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td><input type="text" class="harga-inp" id="hj-${b}" value="${fN(hj)}" oninput="updateHarga('${b}')" style="width:130px"></td><td><input type="text" class="harga-inp" id="hpp-${b}" value="${fN(hpp)}" oninput="updateHarga('${b}')" style="width:130px"></td><td id="hm-${b}" style="font-weight:700;color:${m>=0?'var(--green)':'var(--red)'}">${m>=0?'Rp ':'-Rp '}${fN(Math.abs(m))}</td><td id="hmp-${b}" style="color:${m>=0?'var(--green)':'var(--red)'}">${(pct>=0?'':'-')+Math.abs(pct).toFixed(2)}%</td></tr>`;}).join('');
+  const rows=BBM.map(b=>{const hj=state.harga[b],hpp=state.harga['hpp_'+b],m=hj-hpp;const pct=hj>0?(m/hj*100):0;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td><input type="text" class="harga-inp" id="hj-${b}" value="${fN(hj)}" oninput="updateHarga('${b}')" style="width:130px"></td><td><input type="text" class="harga-inp" id="mg-${b}" value="${fN(m)}" oninput="updateHarga('${b}')" style="width:130px"></td><td id="hpp-display-${b}" style="font-weight:700;color:var(--blue)">Rp ${fN(hpp)}</td><td id="hmp-${b}" style="color:${m>=0?'var(--green)':'var(--red)'}">${(pct>=0?'':'-')+Math.abs(pct).toFixed(2)}%</td></tr>`;}).join('');
 
   // Riwayat harga
   const riwayat=state.riwayatHarga||[];
@@ -2307,7 +2817,8 @@ function renderHargaPage(main){
         <span style="font-size:11px;color:var(--text3)">${riwayat.length?'Berlaku sejak: '+riwayat[0].tanggal:'Belum ada riwayat'}</span>
       </div>
     </div>
-    <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>Harga Jual (Rp/ltr)</th><th>HPP (Rp/ltr)</th><th>Margin/ltr</th><th>Margin %</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="nt nt-i" style="margin-bottom:12px;font-size:12px">ℹ Input <strong>Harga Jual</strong> dan <strong>Margin/ltr</strong> — HPP dihitung otomatis: <code style="background:var(--surface2);padding:1px 6px;border-radius:4px">HPP = Harga Jual − Margin</code></div>
+    <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>Harga Jual (Rp/ltr)</th><th>Margin/ltr (input)</th><th>HPP (otomatis)</th><th>Margin %</th></tr></thead><tbody>${rows}</tbody></table></div>
     <div class="g4" style="margin-top:16px">
       ${BBM.map(b=>{const hj=state.harga[b],hpp=state.harga['hpp_'+b],m=hj-hpp;return`<div class="metric" id="hcard-${b}"><div class="metric-label">Margin ${BL[b]}</div><div class="metric-value ${m>=0?'c-green':'c-red'}" id="hmc-${b}">${m>=0?'':'-'}Rp ${fN(Math.abs(m))}/ltr</div></div>`;}).join('')}
     </div>
@@ -2369,10 +2880,12 @@ function konfirmasiSimpanRiwayatHarga(){
 
 function updateHarga(b){
   const hjRaw=parseInt((e('hj-'+b)?.value||'').replace(/\./g,''))||0;
-  const hppRaw=parseInt((e('hpp-'+b)?.value||'').replace(/\./g,''))||0;
-  state.harga[b]=hjRaw;state.harga['hpp_'+b]=hppRaw;
-  const m=hjRaw-hppRaw;const pct=hjRaw>0?(m/hjRaw*100):0;
-  const mEl=e('hm-'+b);if(mEl){mEl.textContent=(m>=0?'Rp ':'-Rp ')+fN(Math.abs(m));mEl.style.color=m>=0?'var(--green)':'var(--red)';}
+  const mgRaw=parseInt((e('mg-'+b)?.value||'').replace(/\./g,''))||0;
+  const hppCalc=hjRaw-mgRaw; // HPP = Harga Jual - Margin
+  state.harga[b]=hjRaw;state.harga['hpp_'+b]=hppCalc;
+  const m=mgRaw;const pct=hjRaw>0?(m/hjRaw*100):0;
+  // Update tampilan HPP otomatis
+  const hppEl=e('hpp-display-'+b);if(hppEl){hppEl.textContent='Rp '+fN(hppCalc);hppEl.style.color=hppCalc>=0?'var(--blue)':'var(--red)';}
   const mpEl=e('hmp-'+b);if(mpEl){mpEl.textContent=(pct>=0?'':'-')+Math.abs(pct).toFixed(2)+'%';mpEl.style.color=m>=0?'var(--green)':'var(--red)';}
   const mcEl=e('hmc-'+b);if(mcEl){mcEl.textContent=(m>=0?'':'-')+'Rp '+fN(Math.abs(m))+'/ltr';mcEl.className='metric-value '+(m>=0?'c-green':'c-red');}
   dbSave();
@@ -2602,6 +3115,33 @@ function respond(obj) {
     </div>
   </div>
 
+  <!-- PROFIL PERUSAHAAN -->
+  <div class="card" style="border:1.5px solid var(--blue-light)">
+    <div class="card-title" style="color:var(--blue)">🏢 Profil Perusahaan</div>
+    <div class="nt nt-i" style="margin-bottom:14px">Nama dan informasi SPBU ini akan muncul di semua laporan yang dicetak.</div>
+    <div class="g2" style="margin-bottom:12px">
+      <div class="fg">
+        <label>Nama Perusahaan / SPBU</label>
+        <input type="text" class="inp" id="profil-nama" placeholder="cth: SPBU 34.123.01 Mataram" value="${esc(getProfil().nama||'')}">
+      </div>
+      <div class="fg">
+        <label>No. SPBU Pertamina</label>
+        <input type="text" class="inp" id="profil-nospbu" placeholder="cth: 34.123.01" value="${esc(getProfil().noSpbu||'')}">
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:14px">
+      <div class="fg">
+        <label>Alamat</label>
+        <input type="text" class="inp" id="profil-alamat" placeholder="Alamat SPBU" value="${esc(getProfil().alamat||'')}">
+      </div>
+      <div class="fg">
+        <label>Telepon</label>
+        <input type="text" class="inp" id="profil-telp" placeholder="No. telepon" value="${esc(getProfil().telp||'')}">
+      </div>
+    </div>
+    <button class="btn btn-save" onclick="simpanProfil()">💾 Simpan Profil</button>
+  </div>
+
   <!-- GANTI PASSWORD (owner only) -->
   ${currentUser&&currentUser.role==='owner'?`
   <div class="card" style="border:1.5px solid var(--amber-light)">
@@ -2781,12 +3321,28 @@ function init(){
   try{
     const sess=localStorage.getItem(AUTH_KEY);
     if(sess){
-      currentUser=JSON.parse(sess);
+      const saved=JSON.parse(sess);
+      // Validasi struktur session
+      if(!saved||!saved.id||!saved.role){
+        localStorage.removeItem(AUTH_KEY);
+        return; // tampilkan login screen
+      }
+      // SELALU refresh dari users database (penting untuk update menu)
+      const fresh=getUserById(saved.id);
+      if(fresh){
+        currentUser={...fresh};
+        // Update session dengan data terbaru
+        localStorage.setItem(AUTH_KEY,JSON.stringify(currentUser));
+      }else{
+        // User sudah dihapus — paksa logout
+        localStorage.removeItem(AUTH_KEY);
+        return;
+      }
       showApp();
     }
-    // Kalau tidak ada session, login screen sudah tampil by default
   }catch(e){
-    // Session invalid, tetap di login screen
+    console.warn('Session invalid, reset:',e.message);
+    localStorage.removeItem(AUTH_KEY);
   }
 })();
 </script>
