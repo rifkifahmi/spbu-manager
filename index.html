@@ -1064,7 +1064,7 @@ function renderShifts(){
         <td><span class="tag ${BT[b]}">${BL[b]}</span></td>
         <td>
           <input type="text" id="${sh}-awal-${b}" value="${awalVal}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px">
-          ${isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:var(--blue);margin-top:2px;white-space:nowrap">↑ akhir kemarin: ${fN(prevDayVal)} ltr</div>`:''}
+          ${isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:var(--blue);margin-top:2px;white-space:nowrap">↑ stok akhir ${getPrevDayTanggal(tgl)||'sebelumnya'}: ${fN(prevDayVal)} ltr</div>`:''}
           ${isAuto&&!isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:${prevShiftVal>0?'var(--blue)':'var(--red)'};margin-top:2px;white-space:nowrap">↑ stok akhir ${prev?cap(prev):''}: ${fN(prevShiftVal)} ltr</div>`:''}
         </td>
         <td><input type="text" id="${sh}-jual-${b}" value="${d.jual||0}" class="${jualStyle}" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px"></td>
@@ -1114,8 +1114,8 @@ function renderShifts(){
       // Selalu cek histori hari sebelumnya, lintas bulan & tahun
       const adaKemarin=BBM.some(b=>getPrevDayStock(tglVal,b)!==null);
       if(adaKemarin){
-        const prevTglStr=(()=>{const t=new Date(tglVal+'T00:00:00');t.setDate(t.getDate()-1);return t.toISOString().slice(0,10);})();
-        autoNote=`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">🔗 Stok awal otomatis dari stok akhir hari sebelumnya (${prevTglStr}) — rantai stok berkelanjutan.</div>`;
+        const prevTglStr=getPrevDayTanggal(tglVal)||'';
+        autoNote=`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">🔗 Stok awal otomatis dari stok akhir terakhir (${prevTglStr}) — rantai stok berkelanjutan.</div>`;
       } else {
         autoNote=`<div class="nt nt-w" style="margin-bottom:12px;font-size:12px">⚠ Belum ada data hari sebelumnya. Isi stok awal secara manual sebagai stok pembuka.</div>`;
       }
@@ -3462,14 +3462,25 @@ function importData(ev){
 
 // Cari stok akhir efektif dari hari sebelumnya di savedData
 function getPrevDayStock(tanggalStr,b){
+  // Ambil stok akhir dari data tersimpan TERAKHIR sebelum tanggal ini
+  // — otomatis menembus batas bulan, tahun, atau hari yang dilewat
   if(!tanggalStr)return null;
-  const tgl=new Date(tanggalStr+'T00:00:00');
-  tgl.setDate(tgl.getDate()-1);
-  const prevTgl=tgl.getFullYear()+'-'+String(tgl.getMonth()+1).padStart(2,'0')+'-'+String(tgl.getDate()).padStart(2,'0');
-  const prevRec=state.savedData.find(d=>d.tanggal===prevTgl);
-  if(!prevRec)return null;
+  const sorted=[...state.savedData]
+    .filter(d=>d.tanggal<tanggalStr)
+    .sort((a,b)=>a.tanggal>b.tanggal?-1:1); // desc: terbaru dulu
+  if(!sorted.length)return null;
+  const prevRec=sorted[0];
   const lastShift=prevRec.shifts[prevRec.shifts.length-1];
   return prevRec.shiftData[lastShift]?.[b]?.stokAkhirEfektif??null;
+}
+
+// Ambil tanggal dari data tersimpan terakhir sebelum tanggalStr
+function getPrevDayTanggal(tanggalStr){
+  if(!tanggalStr)return null;
+  const sorted=[...state.savedData]
+    .filter(d=>d.tanggal<tanggalStr)
+    .sort((a,b)=>a.tanggal>b.tanggal?-1:1);
+  return sorted.length?sorted[0].tanggal:null;
 }
 
 // Apakah tanggal ini adalah tanggal 1 bulan?
