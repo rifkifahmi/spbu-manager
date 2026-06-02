@@ -1064,8 +1064,9 @@ function renderShifts(){
         <td><span class="tag ${BT[b]}">${BL[b]}</span></td>
         <td>
           <input type="text" id="${sh}-awal-${b}" value="${awalVal}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px">
-          ${isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:var(--blue);margin-top:2px;white-space:nowrap">↑ stok akhir ${getPrevDayTanggal(tgl)||'sebelumnya'}: ${fN(prevDayVal)} ltr</div>`:''}
+          ${isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:var(--blue);margin-top:2px;white-space:nowrap">↑ dari ${getPrevDayTanggal(tgl)||'data sebelumnya'}: ${fN(prevDayVal)} ltr</div>`:''}
           ${isAuto&&!isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:${prevShiftVal>0?'var(--blue)':'var(--red)'};margin-top:2px;white-space:nowrap">↑ stok akhir ${prev?cap(prev):''}: ${fN(prevShiftVal)} ltr</div>`:''}
+          ${isPagi&&!isAwalAuto&&!isAuto?`<div style="font-size:10px;color:var(--amber);margin-top:2px;white-space:nowrap">✏ Stok pembuka — input manual</div>`:''}
         </td>
         <td><input type="text" id="${sh}-jual-${b}" value="${d.jual||0}" class="${jualStyle}" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px"></td>
         <td id="${sh}-catatan-cell-${b}">—</td>
@@ -1109,15 +1110,15 @@ function renderShifts(){
     const tglVal=e('f-tanggal')?.value||'';
     let autoNote='';
     if(prev){
-      autoNote=`<div class="nt nt-i" style="margin-bottom:12px;font-size:12px">🔗 Stok awal = stok akhir efektif Shift ${cap(prev)} — otomatis terhubung.</div>`;
+      autoNote=`<div class="nt nt-i" style="margin-bottom:12px;font-size:12px">🔗 Stok awal = stok akhir efektif Shift ${cap(prev)} — otomatis terhubung dan selalu terbarui.</div>`;
     } else if(isPagi){
-      // Selalu cek histori hari sebelumnya, lintas bulan & tahun
+      // Selalu cek histori — lintas bulan & tahun, ambil data terakhir yang ada
       const adaKemarin=BBM.some(b=>getPrevDayStock(tglVal,b)!==null);
       if(adaKemarin){
         const prevTglStr=getPrevDayTanggal(tglVal)||'';
-        autoNote=`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">🔗 Stok awal otomatis dari stok akhir terakhir (${prevTglStr}) — rantai stok berkelanjutan.</div>`;
+        autoNote=`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">🔗 Stok awal otomatis dari data terakhir (${prevTglStr}) — rantai stok berkelanjutan. Tidak perlu input manual.</div>`;
       } else {
-        autoNote=`<div class="nt nt-w" style="margin-bottom:12px;font-size:12px">⚠ Belum ada data hari sebelumnya. Isi stok awal secara manual sebagai stok pembuka.</div>`;
+        autoNote=`<div class="nt nt-w" style="margin-bottom:12px;font-size:12px">⚠ Belum ada data sebelumnya. Isi stok awal secara manual sebagai stok pembuka pertama kali.</div>`;
       }
     }
     return`<div class="shift-block">
@@ -3492,8 +3493,17 @@ function isTanggal1(tanggalStr){
 function onTgl(){
   const t=e('f-tanggal')?.value;
   if(t&&e('f-hari'))e('f-hari').value=HARI[new Date(t+'T00:00:00').getDay()];
-  // Re-render shifts agar stok awal otomatis diupdate saat tanggal berubah
-  renderShifts();
+  // Reset nilai awal di draft agar stok awal selalu fresh dari histori tanggal baru
+  // (nilai jual/tambah tetap terjaga di draft)
+  if(state.draft){
+    ['pagi','siang','malam'].forEach(sh=>{
+      if(state.draft[sh]){
+        BBM.forEach(b=>{if(state.draft[sh][b])state.draft[sh][b].awal=0;});
+      }
+    });
+  }
+  // Re-render shifts agar stok awal otomatis diupdate + calcAll untuk propagasi
+  renderShifts();calcAll();
 }
 
 // ─── INIT ────────────────────────────────────────────────────
