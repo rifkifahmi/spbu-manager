@@ -722,13 +722,30 @@ const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&g
 function toast(msg,dur=2500){const t=e('toast');if(!t)return;t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),dur);}
 
 // ─── LOGIKA STOK ────────────────────────────────────────────
-// LOSSES = Awal − Jual  (habis dicentang)
-// PLUS   = Jual − Awal  (jual > awal otomatis)
+// ─── RUMUS LOSSES & PLUS ────────────────────────────────────
+// LOSSES = Stok Tercatat − Penjualan   (tangki habis fisik dicentang)
+//   Contoh: Stok tercatat 3.822, terjual 3.000, tangki habis
+//           Losses = 3.822 − 3.000 = 822 ltr (selisih yang tidak bisa dijual)
+//           Stok akhir = 0 (habis fisik) + penambahan mid-shift jika ada
+//
+// PLUS   = Penjualan − Stok Tercatat   (jual melebihi catatan, otomatis)
+//   Terjadi saat stok fisik lebih banyak dari catatan
+//
 // Penambahan mid-shift langsung masuk stok berjalan shift tersebut
 function calcRow(awal,jual,tambah,habis){
-  const selisih=awal-jual;
-  if(habis){const losses=Math.max(0,selisih);return{catatan:0,losses,plus:0,jualEfektif:jual,stokBaru:tambah,stokAkhirEfektif:tambah,isLocked:true,lockType:'losses'};}
-  if(selisih<0){const plus=Math.abs(selisih);return{catatan:0,losses:0,plus,jualEfektif:jual,stokBaru:tambah,stokAkhirEfektif:tambah,isLocked:true,lockType:'plus'};}
+  const selisih=awal-jual; // positif = ada sisa, negatif = jual melebihi catatan
+  if(habis){
+    // Tangki habis fisik — losses = selisih yang tidak terjual (stok catatan sisa)
+    // Contoh: awal 3.822, jual 3.000, habis → losses = 3.822 - 3.000 = 822
+    const losses=Math.max(0,selisih);
+    return{catatan:0,losses,plus:0,jualEfektif:jual,stokBaru:tambah,stokAkhirEfektif:tambah,isLocked:true,lockType:'losses'};
+  }
+  if(selisih<0){
+    // Jual melebihi catatan → Plus (surplus stok fisik)
+    const plus=Math.abs(selisih);
+    return{catatan:0,losses:0,plus,jualEfektif:jual,stokBaru:tambah,stokAkhirEfektif:tambah,isLocked:true,lockType:'plus'};
+  }
+  // Normal: masih ada sisa stok
   const catatan=selisih+tambah;
   return{catatan,losses:0,plus:0,jualEfektif:jual,stokBaru:0,stokAkhirEfektif:catatan,isLocked:false,lockType:'normal'};
 }
@@ -959,7 +976,7 @@ function renderInputPage(main){
     <div class="page-sub">Catat penjualan, stok, dan penambahan BBM per shift</div>
   </div>
   <div class="formula-box">
-    <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--red);font-weight:700">▲ Losses</span><span class="feq">Awal − Jual</span></div>
+    <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--red);font-weight:700">▲ Losses</span><span class="feq">Stok Tercatat − Penjualan</span><span style="font-size:11px;color:var(--text2)">(tangki habis fisik)</span></div>
     <span style="color:var(--border2)">|</span>
     <div style="display:flex;align-items:center;gap:6px"><span style="color:var(--purple);font-weight:700">↑ Plus</span><span class="feq">Jual − Awal</span></div>
     <span style="color:var(--border2)">|</span>
@@ -1183,7 +1200,7 @@ function confirmResetShift(sh){
     state.shiftSaved[sh]=false;
     BBM.forEach(b=>{
       const aEl=e(`${sh}-awal-${b}`);if(aEl&&!aEl.readOnly)aEl.value=0;
-      const jEl=e(`${sh}-jual-${b}`);if(jEl)jEl.value=0;
+      const jEl=e(`${sh}-jual-${b}`);if(jEl){jEl.value=0;jEl.dataset.jualAsli='';}
       const tEl=e(`${sh}-tambah-${b}`);if(tEl)tEl.value=0;
       const hEl=e(`${sh}-habis-${b}`);if(hEl)hEl.checked=false;
     });
@@ -1210,22 +1227,28 @@ function calcShift(sh){
   BBM.forEach(b=>{
     const awal=gv(`${sh}-awal-${b}`);
     const habis=gck(`${sh}-habis-${b}`);
-    const jual=gv(`${sh}-jual-${b}`);
+    const jEl=e(`${sh}-jual-${b}`);
+    // Baca nilai jual: jika habis, gunakan nilai asli dari dataset (bukan 0)
+    const jual=habis&&jEl?.dataset?.jualAsli?parseInt((jEl.dataset.jualAsli||'0').replace(/\./g,''))||0:gv(`${sh}-jual-${b}`);
     const tambah=gv(`${sh}-tambah-${b}`);
     const r=calcRow(awal,jual,tambah,habis);
-    const jEl=e(`${sh}-jual-${b}`);
-    if(jEl&&!state.shiftSaved[sh]){if(habis){jEl.value=0;jEl.readOnly=true;jEl.className='inp inp-num';jEl.style.background='var(--surface2)';jEl.style.color='var(--text3)';}else{jEl.readOnly=false;jEl.style.background='';jEl.style.color='';}}
+    if(jEl&&!state.shiftSaved[sh]){if(habis){
+      // Simpan nilai jual asli sebelum dikunci — dipakai untuk hitung losses
+      if(jEl.dataset.jualAsli===undefined||jEl.dataset.jualAsli==='')jEl.dataset.jualAsli=jEl.value;
+      jEl.value=jEl.dataset.jualAsli||'0'; // tampilkan nilai asli (bukan 0) di field
+      jEl.readOnly=true;jEl.className='inp inp-num';jEl.style.background='var(--red-bg)';jEl.style.color='var(--red)';
+    }else{jEl.dataset.jualAsli='';jEl.readOnly=false;jEl.style.background='';jEl.style.color='';}}
     const cc=e(`${sh}-catatan-cell-${b}`);
     if(cc){if(r.isLocked){const cls=r.lockType==='losses'?'pill pill-zero-l':'pill pill-zero-p';cc.innerHTML=`<span class="${cls}">0 🔒</span>`;}else if(r.catatan<=BATAS[b]&&r.catatan>0){cc.innerHTML=`<span class="pill pill-rendah">${fN(r.catatan)}</span>`;}else{cc.innerHTML=`<span class="pill pill-ok">${fN(r.catatan)}</span>`;}}
     const sc2=e(`${sh}-sel-cell-${b}`);
-    if(sc2){if(r.isLocked&&r.lockType==='losses'){sc2.innerHTML=`<span class="losses-val">▲ ${fN(r.losses)} ltr 🔒<br><small>${fN(awal)}−${fN(jual)}=${fN(r.losses)}</small></span>`;}else if(r.isLocked&&r.lockType==='plus'){sc2.innerHTML=`<span class="plus-val">↑ +${fN(r.plus)} ltr 🔒<br><small>${fN(jual)}−${fN(awal)}=${fN(r.plus)}</small></span>`;}else{sc2.innerHTML='<span style="color:var(--text3);font-size:12px">— Normal</span>';}}
+    if(sc2){if(r.isLocked&&r.lockType==='losses'){sc2.innerHTML=`<span class="losses-val">▲ Losses ${fN(r.losses)} ltr 🔒<br><small style="font-weight:400">Stok ${fN(awal)} − Jual ${fN(jual)} = <strong>${fN(r.losses)}</strong></small></span>`;}else if(r.isLocked&&r.lockType==='plus'){sc2.innerHTML=`<span class="plus-val">↑ Plus +${fN(r.plus)} ltr 🔒<br><small style="font-weight:400">Jual ${fN(jual)} − Stok ${fN(awal)} = <strong>${fN(r.plus)}</strong></small></span>`;}else{sc2.innerHTML='<span style="color:var(--text3);font-size:12px">— Normal</span>';}}
     const ns=e(`${sh}-stk-cur-${b}`);
     if(ns){if(tambah>0){ns.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;}else{ns.textContent='';}}
     const tr=e(`tr-${sh}-${b}`);
     if(tr)tr.className=r.isLocked&&r.lockType==='losses'?'row-losses':r.isLocked&&r.lockType==='plus'?'row-plus':state.shiftSaved[sh]?'row-saved':'';
     const st2=e(`${sh}-status-${b}`);
     if(st2){if(r.isLocked&&r.lockType==='losses'){let s=`<span class="bx bl">Losses 🔒</span>`;if(tambah>0)s+=` <span class="bx bn">+${fN(tambah)} baru</span>`;st2.innerHTML=s;}else if(r.isLocked&&r.lockType==='plus'){let s=`<span class="bx bp">Plus 🔒</span>`;if(tambah>0)s+=` <span class="bx bn">+${fN(tambah)} baru</span>`;st2.innerHTML=s;}else if(r.catatan<=BATAS[b]&&r.catatan>0){st2.innerHTML='<span class="bx bw">Rendah</span>';}else{st2.innerHTML='<span class="bx bk">OK</span>';}}
-    if(r.isLocked&&r.lockType==='losses'){let msg=`▲ <strong>${BL[b]}</strong>: Losses = ${fN(awal)}−${fN(jual)} = <strong>${fN(r.losses)} ltr</strong> 🔒 — kerugian ${fRF(r.losses*gHJ(b))}.`;if(tambah>0)msg+=` Penambahan ${fN(tambah)} ltr = stok baru.`;notices.push(`<div class="nt nt-d">${msg}</div>`);}
+    if(r.isLocked&&r.lockType==='losses'){let msg=`▲ <strong>${BL[b]}</strong>: Tangki habis — Losses = Stok ${fN(awal)} − Jual ${fN(jual)} = <strong>${fN(r.losses)} ltr 🔒</strong> — kerugian ${fRF(r.losses*gHJ(b))}.`;if(tambah>0)msg+=` Penambahan ${fN(tambah)} ltr masuk sebagai stok baru.`;notices.push(`<div class="nt nt-d">${msg}</div>`);}
     if(r.isLocked&&r.lockType==='plus'){let msg=`↑ <strong>${BL[b]}</strong>: Plus = ${fN(jual)}−${fN(awal)} = <strong>${fN(r.plus)} ltr</strong> 🔒 — keuntungan +${fRF(r.plus*gHJ(b))}.`;if(tambah>0)msg+=` Penambahan ${fN(tambah)} ltr = stok baru.`;notices.push(`<div class="nt nt-p">${msg}</div>`);}
     if(!r.isLocked&&r.catatan>0&&r.catatan<=BATAS[b])notices.push(`<div class="nt nt-w">⚠ <strong>${BL[b]}</strong>: Stok menipis sisa ${fN(r.catatan)} ltr.</div>`);
     if(tambah>0&&!r.isLocked)notices.push(`<div class="nt nt-s">+ <strong>${BL[b]}</strong>: Penambahan ${fN(tambah)} ltr berjalan — stok akhir ${fN(r.stokAkhirEfektif)} ltr.</div>`);
@@ -1275,7 +1298,22 @@ function onFC(sh,b){
   for(let i=idx+1;i<active.length;i++)propagate(active[i-1],active[i]);
   updatePreviewIfOpen();
 }
-function onHabis(sh,b){onFC(sh,b);}
+function onHabis(sh,b){
+  const jEl=e(`${sh}-jual-${b}`);
+  const habis=gck(`${sh}-habis-${b}`);
+  if(jEl){
+    if(habis){
+      // Simpan nilai jual asli sebelum dikunci, lalu tampilkan (merah, readonly)
+      if(!jEl.dataset.jualAsli||jEl.dataset.jualAsli==='')jEl.dataset.jualAsli=jEl.value;
+    }else{
+      // Uncentang — restore nilai asli dan buka kunci
+      if(jEl.dataset.jualAsli)jEl.value=jEl.dataset.jualAsli;
+      jEl.dataset.jualAsli='';
+      jEl.readOnly=false;jEl.style.background='';jEl.style.color='';
+    }
+  }
+  onFC(sh,b);
+}
 function onTambahTargetChange(sh){
   const active=SO.filter(s=>state.sel[s]);
   const idx=active.indexOf(sh);
@@ -1363,7 +1401,10 @@ function getAkum(){
     let tJual=0,tTambah=0,tLosses=0,tPlus=0,stokAkhir=0;
     active.forEach(sh=>{
       const a=gv(`${sh}-awal-${b}`)||0;const habis=gck(`${sh}-habis-${b}`);
-      const jual=gv(`${sh}-jual-${b}`)||0;const tambah=gv(`${sh}-tambah-${b}`)||0;
+      // Baca nilai jual: jika habis, ambil dari dataset.jualAsli (nilai sebelum dikunci)
+      const jEl=e(`${sh}-jual-${b}`);
+      const jual=habis&&jEl?.dataset?.jualAsli?parseInt((jEl.dataset.jualAsli||'0').replace(/\./g,''))||0:gv(`${sh}-jual-${b}`)||0;
+      const tambah=gv(`${sh}-tambah-${b}`)||0;
       const tambahTarget=getTambahTarget(sh);
       const tambahCur=tambahTarget==='current'?tambah:0;
       const r=calcRow(a,jual,tambahCur,habis);
@@ -1446,7 +1487,10 @@ function saveData(){
   const shiftData={};
   active.forEach(sh=>{shiftData[sh]={};BBM.forEach(b=>{
     const awal=gv(`${sh}-awal-${b}`)||0;const habis=gck(`${sh}-habis-${b}`);
-    const jual=gv(`${sh}-jual-${b}`)||0;const tambah=gv(`${sh}-tambah-${b}`)||0;
+    // Baca nilai jual: jika habis, ambil dari dataset.jualAsli (nilai sebelum dikunci)
+    const jElS=e(`${sh}-jual-${b}`);
+    const jual=habis&&jElS?.dataset?.jualAsli?parseInt((jElS.dataset.jualAsli||'0').replace(/\./g,''))||0:gv(`${sh}-jual-${b}`)||0;
+    const tambah=gv(`${sh}-tambah-${b}`)||0;
     // Gunakan tambahTarget agar losses/plus dihitung benar
     const tambahTarget=getTambahTarget(sh);
     const tambahCur=tambahTarget==='current'?tambah:0;
