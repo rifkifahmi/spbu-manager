@@ -1039,11 +1039,10 @@ function renderShifts(){
     const rows=BBM.map(b=>{
       const d=(!isPagi&&prev&&state.draft?.[sh]?.[b])?state.draft[sh][b]:(isPagi&&state.draft?.pagi?.[b])?state.draft.pagi[b]:(def[b]||{});
       const tgl=e('f-tanggal')?.value||'';
-      const tgl1=isTanggal1(tgl);
-      // Shift Pagi: jika bukan tgl 1, cek histori hari sebelumnya
-      const prevDayVal=isPagi&&!tgl1?getPrevDayStock(tgl,b):null;
-      const isAwalAuto=isPagi&&!tgl1&&prevDayVal!==null;
-      // Hitung stok awal otomatis dari stok akhir efektif shift sebelumnya
+      // Shift Pagi: SELALU cek histori hari sebelumnya (lintas bulan/tahun)
+      const prevDayVal=isPagi?getPrevDayStock(tgl,b):null;
+      const isAwalAuto=isPagi&&prevDayVal!==null;
+      // Hitung stok awal otomatis dari stok akhir efektif shift sebelumnya (dalam hari)
       let prevShiftVal=0;
       if(!isPagi&&prev){
         const pAwal=parseInt((e(`${prev}-awal-${b}`)?.value||'0').replace(/\./g,''))||0;
@@ -1059,12 +1058,13 @@ function renderShifts(){
       const awalVal=isAwalAuto?prevDayVal:(!isPagi&&prev?prevShiftVal:(d.awal||0));
       const isAuto=(!isPagi&&prev)||isAwalAuto;
       const lock=saved;
-      const awalStyle=isAwalAuto?'inp inp-num inp-auto':(isAuto&&!isAwalAuto?'inp inp-num inp-auto':(lock?'inp inp-num':'inp inp-num'));
+      const awalStyle=(isAuto||lock)?'inp inp-num inp-auto':'inp inp-num';
       const jualStyle=lock?'inp inp-num':'inp inp-num';
       return`<tr id="tr-${sh}-${b}">
         <td><span class="tag ${BT[b]}">${BL[b]}</span></td>
         <td>
           <input type="text" id="${sh}-awal-${b}" value="${awalVal}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px">
+          ${isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:var(--blue);margin-top:2px;white-space:nowrap">↑ akhir kemarin: ${fN(prevDayVal)} ltr</div>`:''}
           ${isAuto&&!isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:${prevShiftVal>0?'var(--blue)':'var(--red)'};margin-top:2px;white-space:nowrap">↑ stok akhir ${prev?cap(prev):''}: ${fN(prevShiftVal)} ltr</div>`:''}
         </td>
         <td><input type="text" id="${sh}-jual-${b}" value="${d.jual||0}" class="${jualStyle}" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px"></td>
@@ -1107,20 +1107,18 @@ function renderShifts(){
       </div>`:'';
     const tambahNote=nextShift?'':`<div style="font-size:11px;color:var(--text3);margin-top:6px">ℹ Tidak ada shift berikutnya — penambahan masuk ke stok shift ini.</div>`;
     const tglVal=e('f-tanggal')?.value||'';
-    const tgl1=isTanggal1(tglVal);
     let autoNote='';
     if(prev){
-      autoNote=`<div class="nt nt-i" style="margin-bottom:12px;font-size:12px">ℹ Stok awal otomatis dari stok akhir efektif ${cap(prev)}.</div>`;
-    } else if(isPagi&&!tgl1){
-      // Cek apakah ada data kemarin
+      autoNote=`<div class="nt nt-i" style="margin-bottom:12px;font-size:12px">🔗 Stok awal = stok akhir efektif Shift ${cap(prev)} — otomatis terhubung.</div>`;
+    } else if(isPagi){
+      // Selalu cek histori hari sebelumnya, lintas bulan & tahun
       const adaKemarin=BBM.some(b=>getPrevDayStock(tglVal,b)!==null);
       if(adaKemarin){
-        autoNote=`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">✓ Stok awal otomatis dari stok akhir efektif hari sebelumnya.</div>`;
+        const prevTglStr=(()=>{const t=new Date(tglVal+'T00:00:00');t.setDate(t.getDate()-1);return t.toISOString().slice(0,10);})();
+        autoNote=`<div class="nt nt-s" style="margin-bottom:12px;font-size:12px">🔗 Stok awal otomatis dari stok akhir hari sebelumnya (${prevTglStr}) — rantai stok berkelanjutan.</div>`;
       } else {
-        autoNote=`<div class="nt nt-w" style="margin-bottom:12px;font-size:12px">⚠ Tidak ada data hari sebelumnya. Isi stok awal secara manual.</div>`;
+        autoNote=`<div class="nt nt-w" style="margin-bottom:12px;font-size:12px">⚠ Belum ada data hari sebelumnya. Isi stok awal secara manual sebagai stok pembuka.</div>`;
       }
-    } else if(isPagi&&tgl1){
-      autoNote=`<div class="nt nt-i" style="margin-bottom:12px;font-size:12px">📅 Tanggal 1 bulan — isi stok awal secara manual sebagai stok pembuka bulan.</div>`;
     }
     return`<div class="shift-block">
       <div class="shift-hdr ${si.hdr}">
@@ -1132,7 +1130,7 @@ function renderShifts(){
         <div class="tbl-wrap"><table class="stbl">
           <thead><tr>
             <th style="text-align:left;min-width:80px">BBM</th>
-            <th>${prev?'Dari '+cap(prev):(isPagi&&!tgl1&&BBM.some(b=>getPrevDayStock(tglVal,b)!==null)?'Dari Kemarin':'Stok Awal')}</th>
+            <th>${prev?'Dari '+cap(prev):(isPagi&&BBM.some(b=>getPrevDayStock(tglVal,b)!==null)?'Dari Kemarin':'Stok Awal')}</th>
             <th>Penjualan (ltr)</th>
             <th>Stok Catatan Akhir</th>
             <th>Losses / Plus</th>
@@ -1482,8 +1480,41 @@ function saveData(){
 // PAGE: STOK BBM
 // ════════════════════════════════════════════════════════════
 function renderStokPage(main){
+  // ── Hitung running stok kumulatif dari semua savedData ───
+  function getRunningStok(){
+    const sorted=[...state.savedData].sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+    const run={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+    const rows=[];
+    sorted.forEach(d=>{
+      const ac=d.shifts;
+      BBM.forEach(b=>{
+        const awal=d.shiftData[ac[0]]?.[b]?.awal||0;
+        let jual=0,tambah=0,losses=0,plus=0;
+        ac.forEach(sh=>{const sd=d.shiftData[sh]?.[b]||{};jual+=sd.jual||0;tambah+=sd.tambah||0;losses+=sd.losses||0;plus+=sd.plus||0;});
+        const akhir=d.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0;
+        run[b]=akhir;
+      });
+      rows.push({tanggal:d.tanggal,hari:d.hari,stokAkhir:{...run}});
+    });
+    return rows;
+  }
+
+  // ── Stok sistem terkini = stok akhir hari terakhir tersimpan ─
+  function getStokSistemTerkini(){
+    const sorted=[...state.savedData].sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+    const res={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+    if(!sorted.length)return res;
+    const d=sorted[sorted.length-1];const ac=d.shifts;
+    BBM.forEach(b=>{res[b]=d.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0;});
+    return res;
+  }
+
+  if(!state.savedData.length){
+    main.innerHTML=`<div class="page-header"><div class="page-title">Stok BBM</div></div><div class="card"><div class="empty-state">Belum ada data tersimpan. Input data melalui halaman Input Data.</div></div>`;
+    return;
+  }
+
   const fd=state.savedData[0];
-  if(!fd){main.innerHTML=`<div class="page-header"><div class="page-title">Stok BBM</div></div><div class="card"><div class="empty-state">Belum ada data tersimpan. Input data melalui halaman Input Data.</div></div>`;return;}
   const ac=fd.shifts;let tA=0,tJ=0,tT=0,tK=0,tL=0,tP=0,tLRp=0,tPRp=0;
   BBM.forEach(b=>{tA+=(fd.shiftData[ac[0]]?.[b]?.awal||0);ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};tJ+=d.jual||0;tT+=d.tambah||0;tL+=d.losses||0;tP+=d.plus||0;tLRp+=(d.losses||0)*gHJ(b);tPRp+=(d.plus||0)*gHJ(b);});tK+=(fd.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0);});
   const shiftNavBtns=ac.map((sh,i)=>`<button class="snavbtn${i===0?' active':''}" onclick="switchSV(this,'sv-${sh}')">${cap(sh)}</button>`).join('');
@@ -1493,27 +1524,179 @@ function renderStokPage(main){
   }).join('');
   let rA=0,rT=0,rJ=0,rK=0,rL=0,rP=0,rO=0;
   const rrows=BBM.map(b=>{const awal=fd.shiftData[ac[0]]?.[b]?.awal||0;let t=0,j=0,l=0,p=0;ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};t+=d.tambah||0;j+=d.jual||0;l+=d.losses||0;p+=d.plus||0;});const k=fd.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0;const o=(j+p)*gHJ(b);rA+=awal;rT+=t;rJ+=j;rK+=k;rL+=l;rP+=p;rO+=o;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td>${fN(awal)}</td><td style="color:var(--green)">+${fN(t)}</td><td>${fN(j)}</td><td style="font-weight:700">${fN(k)}</td><td style="color:var(--red)">${l>0?'-'+fN(l)+' 🔒':'—'}</td><td style="color:var(--purple)">${p>0?'+'+fN(p)+' 🔒':'—'}</td><td>${fR(o)}</td></tr>`;}).join('');
+
+  // ── Running stok historis ─────────────────────────────────
+  const runRows=getRunningStok();
+  const runTableRows=runRows.slice().reverse().map((r,i)=>{
+    const isLatest=i===0;
+    return`<tr style="${isLatest?'font-weight:600;background:var(--surface2)':''}">
+      <td>${r.tanggal}${isLatest?` <span class="pill pill-ok" style="font-size:10px">Terkini</span>`:''}</td>
+      <td>${r.hari||'—'}</td>
+      ${BBM.map(b=>`<td style="text-align:right;color:${r.stokAkhir[b]<=0?'var(--red)':r.stokAkhir[b]<=BATAS[b]?'var(--amber)':'inherit'}">${fN(r.stokAkhir[b])}</td>`).join('')}
+    </tr>`;
+  }).join('');
+
+  // ── Audit stok terkini ────────────────────────────────────
+  const sis=getStokSistemTerkini();
+  const auditFormRows=BBM.map(b=>`
+    <tr>
+      <td><span class="tag ${BT[b]}">${BL[b]}</span></td>
+      <td style="text-align:right;font-weight:600">${fN(sis[b])} ltr</td>
+      <td><input type="text" id="audit-fisik-${b}" class="inp inp-num" placeholder="0" style="width:100px" oninput="hitungSelisihAudit()"></td>
+      <td id="audit-sel-${b}" style="text-align:right;font-weight:700">—</td>
+      <td id="audit-ket-${b}" style="font-size:11px">—</td>
+    </tr>`).join('');
+
+  // ── Histori audit tersimpan ───────────────────────────────
+  const auditHistRows=(state.auditStok||[]).slice().reverse().slice(0,10).map(a=>{
+    const selHtml=BBM.map(b=>{
+      const sel=a.selisih?.[b]||0;
+      return`<span class="tag ${BT[b]}" style="font-size:10px;margin-right:2px">${BL[b]}: ${sel>=0?'+':''}${fN(sel)}</span>`;
+    }).join('');
+    return`<tr>
+      <td>${a.tanggal}</td>
+      <td style="font-size:11px">${a.catatan||'—'}</td>
+      <td>${selHtml}</td>
+      <td style="font-size:11px;color:var(--text3)">${a.waktu||''}</td>
+    </tr>`;
+  }).join('');
+
   main.innerHTML=`<div class="page-header"><div class="page-title">Stok BBM</div><div class="page-sub">Data terakhir: ${fd.tanggal} (${fd.hari})</div></div>
   <div class="g4">
-    <div class="metric"><div class="metric-label">Stok Awal</div><div class="metric-value c-blue">${fN(tA)}</div><div class="metric-sub">liter catatan</div></div>
+    <div class="metric"><div class="metric-label">Stok Awal (Hari Ini)</div><div class="metric-value c-blue">${fN(tA)}</div><div class="metric-sub">liter catatan</div></div>
     <div class="metric"><div class="metric-label">Total Penjualan</div><div class="metric-value">${fN(tJ)}</div><div class="metric-sub">liter terjual</div></div>
     <div class="metric"><div class="metric-label">Penambahan</div><div class="metric-value c-green">+${fN(tT)}</div><div class="metric-sub">liter masuk</div></div>
     <div class="metric"><div class="metric-label">Stok Akhir Efektif</div><div class="metric-value">${fN(tK)}</div><div class="metric-sub">liter tersisa</div></div>
   </div>
   <div class="g4" style="margin-top:-8px">
-    <div class="metric"><div class="metric-label">Losses (Awal−Jual)</div><div class="metric-value c-red">${tL>0?'-'+fN(tL)+' ltr':'0'}</div><div class="metric-sub">🔒 terkunci</div></div>
+    <div class="metric"><div class="metric-label">Losses</div><div class="metric-value c-red">${tL>0?'-'+fN(tL)+' ltr':'0'}</div><div class="metric-sub">🔒 terkunci</div></div>
     <div class="metric"><div class="metric-label">Nilai Losses</div><div class="metric-value c-red">${tLRp>0?'-'+fR(tLRp):'-Rp 0'}</div></div>
-    <div class="metric"><div class="metric-label">Plus (Jual−Awal)</div><div class="metric-value c-purple">${tP>0?'+'+fN(tP)+' ltr':'0'}</div><div class="metric-sub">🔒 terkunci</div></div>
+    <div class="metric"><div class="metric-label">Plus</div><div class="metric-value c-purple">${tP>0?'+'+fN(tP)+' ltr':'0'}</div><div class="metric-sub">🔒 terkunci</div></div>
     <div class="metric"><div class="metric-label">Nilai Plus</div><div class="metric-value c-purple">${tPRp>0?'+'+fR(tPRp):'+Rp 0'}</div></div>
   </div>
+
+  <!-- ═══ AUDIT STOK ═══ -->
   <div class="card">
-    <div class="card-title">Stok Per Shift<div class="snav" style="margin:0">${shiftNavBtns}</div></div>
+    <div class="card-title">🔍 Audit Stok Fisik
+      <span style="font-size:11px;font-weight:400;color:var(--text3);margin-left:8px">Bandingkan stok fisik vs sistem — rekam selisih</span>
+    </div>
+    <div class="nt nt-i" style="font-size:12px;margin-bottom:12px">
+      Stok sistem = stok akhir efektif dari data tersimpan terakhir. Masukkan hasil hitung fisik untuk setiap BBM, lalu simpan audit.
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr>
+          <th style="text-align:left">BBM</th>
+          <th style="text-align:right">Stok Sistem (ltr)</th>
+          <th>Stok Fisik (input)</th>
+          <th style="text-align:right">Selisih (ltr)</th>
+          <th>Status</th>
+        </tr></thead>
+        <tbody>${auditFormRows}</tbody>
+      </table>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+      <input type="date" id="audit-tanggal" style="border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:13px;background:var(--surface);color:var(--text1)">
+      <input type="text" id="audit-catatan" placeholder="Catatan audit (opsional)" style="flex:1;min-width:160px;border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;font-size:13px;background:var(--surface);color:var(--text1)">
+      <button class="btn btn-save" onclick="simpanAudit()">💾 Simpan Audit</button>
+    </div>
+    ${(state.auditStok||[]).length>0?`
+    <div style="margin-top:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Histori Audit (10 Terakhir)</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Tanggal</th><th>Catatan</th><th>Selisih per BBM</th><th>Waktu</th></tr></thead>
+        <tbody>${auditHistRows}</tbody>
+      </table></div>
+    </div>`:''}
+  </div>
+
+  <!-- ═══ RUNNING STOK ═══ -->
+  <div class="card">
+    <div class="card-title">📈 Histori Stok Kumulatif
+      <span style="font-size:11px;font-weight:400;color:var(--text3);margin-left:8px">Stok akhir efektif tiap hari — terakumulasi otomatis</span>
+    </div>
+    <div class="tbl-wrap"><table>
+      <thead><tr>
+        <th>Tanggal</th><th>Hari</th>
+        ${BBM.map(b=>`<th style="text-align:right"><span class="tag ${BT[b]}">${BL[b]}</span></th>`).join('')}
+      </tr></thead>
+      <tbody>${runTableRows||'<tr><td colspan="6" class="empty-state">Belum ada data.</td></tr>'}</tbody>
+    </table></div>
+  </div>
+
+  <!-- ═══ PER SHIFT DATA ═══ -->
+  <div class="card">
+    <div class="card-title">Stok Per Shift — ${fd.tanggal}<div class="snav" style="margin:0">${shiftNavBtns}</div></div>
     ${shiftViews}
   </div>
   <div class="card">
     <div class="card-title">Ringkasan Per BBM</div>
     <div class="tbl-wrap"><table><thead><tr><th style="text-align:left">BBM</th><th>Stok Awal</th><th>Tambah</th><th>Jual</th><th>Stok Akhir</th><th style="color:var(--red)">Losses 🔒</th><th style="color:var(--purple)">Plus 🔒</th><th>Omzet</th></tr></thead><tbody>${rrows}</tbody><tfoot><tr><td>Total</td><td>${fN(rA)}</td><td>+${fN(rT)}</td><td>${fN(rJ)}</td><td>${fN(rK)}</td><td>${rL>0?'-'+fN(rL):'—'}</td><td>${rP>0?'+'+fN(rP):'—'}</td><td>${fR(rO)}</td></tr></tfoot></table></div>
   </div>`;
+
+  // Set default tanggal audit ke hari ini
+  const auditTgl=e('audit-tanggal');
+  if(auditTgl&&!auditTgl.value){const t=new Date();auditTgl.value=`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;}
+}
+
+function hitungSelisihAudit(){
+  function getStokSistemTerkini(){
+    const sorted=[...state.savedData].sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+    const res={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+    if(!sorted.length)return res;
+    const d=sorted[sorted.length-1];const ac=d.shifts;
+    BBM.forEach(b=>{res[b]=d.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0;});
+    return res;
+  }
+  const sis=getStokSistemTerkini();
+  BBM.forEach(b=>{
+    const fisikEl=e(`audit-fisik-${b}`);
+    const selEl=e(`audit-sel-${b}`);
+    const ketEl=e(`audit-ket-${b}`);
+    if(!fisikEl||!selEl||!ketEl)return;
+    const fisikRaw=fisikEl.value.replace(/\./g,'');
+    if(fisikRaw===''){selEl.textContent='—';ketEl.textContent='—';return;}
+    const fisik=parseInt(fisikRaw)||0;
+    const sel=fisik-sis[b];
+    selEl.textContent=(sel>=0?'+':'')+fN(sel)+' ltr';
+    selEl.style.color=sel===0?'var(--green)':sel>0?'var(--purple)':'var(--red)';
+    if(sel===0){ketEl.innerHTML='<span class="bx bk">Sesuai ✓</span>';}
+    else if(sel>0){ketEl.innerHTML=`<span class="bx bp">Lebih +${fN(sel)} ltr</span>`;}
+    else{ketEl.innerHTML=`<span class="bx bl">Kurang ${fN(Math.abs(sel))} ltr</span>`;}
+  });
+}
+
+function simpanAudit(){
+  function getStokSistemTerkini(){
+    const sorted=[...state.savedData].sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+    const res={pertalite:0,pertamax:0,dexlite:0,biosolar:0};
+    if(!sorted.length)return res;
+    const d=sorted[sorted.length-1];const ac=d.shifts;
+    BBM.forEach(b=>{res[b]=d.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0;});
+    return res;
+  }
+  const tanggal=e('audit-tanggal')?.value||'';
+  const catatan=e('audit-catatan')?.value||'';
+  if(!tanggal){toast('Pilih tanggal audit!');return;}
+  const sis=getStokSistemTerkini();
+  const fisik={};const selisih={};
+  let adaInput=false;
+  BBM.forEach(b=>{
+    const v=parseInt((e(`audit-fisik-${b}`)?.value||'').replace(/\./g,''))||0;
+    fisik[b]=v;selisih[b]=v-sis[b];
+    if(e(`audit-fisik-${b}`)?.value.trim())adaInput=true;
+  });
+  if(!adaInput){toast('Masukkan minimal 1 stok fisik!');return;}
+  if(!state.auditStok)state.auditStok=[];
+  state.auditStok.unshift({
+    tanggal,catatan,fisik,sistem:{...sis},selisih,
+    waktu:new Date().toLocaleTimeString('id',{hour:'2-digit',minute:'2-digit'}),
+    savedAt:new Date().toISOString()
+  });
+  state.auditStok=state.auditStok.slice(0,100);
+  dbSave();
+  toast('✓ Audit stok '+tanggal+' tersimpan!');
+  renderStokPage(e('main-content'));
 }
 
 function switchSV(btn,targetId){
