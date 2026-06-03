@@ -216,98 +216,147 @@ tr.row-saved{opacity:.8}
 
 /* RESPONSIVE */
 /* ══════════════════ MOBILE RESPONSIVE ══════════════════ */
+/* ═══════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — Semua Halaman
+   Breakpoint: 768px
+   ═══════════════════════════════════════════════════════ */
 @media(max-width:768px){
-  /* Layout — .layout bukan .main-layout */
+
+  /* ── Layout utama ── */
   .sidebar{display:none !important}
-  .main{padding:12px 10px;min-width:0;overflow-x:hidden}
+  #main-sidebar:not(.mob-open){display:none !important;width:0 !important}
+  #main-layout[style]{flex-direction:column !important}
   .layout{flex-direction:column !important}
+  .main{padding:10px 8px !important;min-width:0;overflow-x:hidden}
+  #main-content{width:100% !important;min-width:0 !important;box-sizing:border-box}
 
-  /* Grid */
-  .form-row.cols-4{grid-template-columns:1fr 1fr}
-  .form-row.cols-3{grid-template-columns:1fr 1fr}
-  .form-row.cols-2{grid-template-columns:1fr}
-  .g4{grid-template-columns:1fr 1fr}
-  .g3{grid-template-columns:1fr 1fr}
-  .g2{grid-template-columns:1fr}
-
-  /* Topbar */
-  .topbar{padding:0 8px;gap:4px;height:48px}
-  .topbar-brand{font-size:13px;flex:1;min-width:0;overflow:hidden}
-  .topbar-brand span:first-child{display:inline}
+  /* ── Topbar ── */
+  .topbar{padding:0 8px;height:48px;gap:6px}
+  .topbar-brand{font-size:13px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .topbar-info{gap:4px}
-  .db-badge{display:none !important}
-  #tb-date{display:none !important}
-  #backup-status-bar{display:none !important}
-  .user-menu span:not(.user-avatar){display:none}
-  .logout-btn{padding:4px 8px;font-size:10px}
-  #tb-role-badge{display:none}
-
-  /* Page header */
-  .page-header{flex-direction:column;align-items:flex-start;gap:8px}
-  .page-header button,.page-header div:last-child{width:100%}
-
-  /* Tables — horizontal scroll */
-  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  .stbl{min-width:500px;font-size:11px}
-  .stbl th,.stbl td{padding:5px 7px}
-
-  /* Cards */
-  .card{padding:12px}
-  .card-title{font-size:13px}
-
-  /* Shift input */
-  .shift-block{margin-bottom:12px}
-  .shift-hdr{padding:10px 12px}
-  .shift-content{padding:10px}
-
-  /* Form fields */
-  .inp{font-size:14px;padding:10px 12px} /* bigger touch targets */
-  .btn{padding:9px 14px;font-size:12px}
-  .btn-sm{padding:6px 10px;font-size:11px}
-
-  /* BBM grid */
-  .bbm-grid{grid-template-columns:1fr 1fr}
-  .dash-kpi{grid-template-columns:1fr 1fr}
-
-  /* Pratinjau */
-  .preview-section{padding:12px}
-
-  /* KPI cards */
-  .kpi-value{font-size:16px}
-
-  /* Snav tabs */
-  .snav{flex-wrap:wrap}
-  .snav-btn{font-size:11px;padding:5px 10px}
-
-  /* Login */
-  .login-box{padding:28px 20px;margin:12px}
-  .login-box .form-row{grid-template-columns:1fr}
-
-  /* Hamburguer menu button */
+  .db-badge,.topbar-info>span,#tb-date,#backup-status-bar,#tb-role-badge{display:none !important}
+  .user-menu .logout-btn{padding:5px 10px;font-size:11px}
   .mob-menu-btn{display:flex !important}
 
-  /* Tambah sec */
-  .tambah-sec{padding:10px}
+  /* ── Cards & Containers ── */
+  .card{padding:12px;border-radius:10px;margin-bottom:10px}
+  .card-title{font-size:13px;padding-bottom:10px;margin-bottom:10px}
+  .page-header{flex-direction:column;align-items:flex-start;gap:8px;margin-bottom:12px}
+  .page-header>div:last-child,.page-header>button{width:100%;justify-content:center}
+  .page-sub{font-size:12px}
 
-  /* Mid-shift badge */
+  /* ── Grid — semua jadi 1 atau 2 kolom ── */
+  .g4,.g3,.g2,
+  [style*="grid-template-columns:repeat(4"],
+  [style*="grid-template-columns:repeat(3"]{
+    grid-template-columns:1fr 1fr !important;
+    gap:8px !important
+  }
+  .form-row.cols-4,.form-row.cols-3{grid-template-columns:1fr 1fr}
+  .form-row.cols-2{grid-template-columns:1fr}
+  [style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr 1fr !important}
+
+  /* ── Tables ── */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -8px;padding:0 8px}
+  .stbl{min-width:460px;font-size:11px}
+  .stbl th,.stbl td{padding:5px 6px;white-space:nowrap}
+
+  /* ── Buttons & Inputs ── */
+  .inp{font-size:14px !important;padding:10px 12px !important}
+  .btn{padding:9px 14px;font-size:12px}
+  .btn-sm{padding:7px 10px;font-size:11px}
+  .btn-lg{width:100%;padding:14px}
+  .snav{flex-wrap:wrap;gap:4px}
+  .snav-btn{font-size:11px;padding:5px 10px}
+
+  /* ── Dashboard ── */
+  .dash-kpi{grid-template-columns:1fr 1fr !important;gap:8px}
+  .kpi-card{padding:12px}
+  .kpi-value{font-size:16px}
+  .kpi-label{font-size:10px}
+  .bbm-grid{grid-template-columns:1fr 1fr !important;gap:8px}
+  .bbm-tile{padding:10px}
+  .bbm-tile-vol{font-size:15px}
+  .dash-greeting{padding:16px}
+  .dash-greeting h2{font-size:17px}
+  .greet-stats{gap:12px}
+  .quick-actions{grid-template-columns:repeat(3,1fr) !important;gap:8px}
+  .qa-card{padding:12px}
+  .qa-icon{font-size:20px;margin-bottom:4px}
+  .qa-label{font-size:11px}
+
+  /* ── Input Data / Shift ── */
+  .shift-block{margin-bottom:10px}
+  .shift-hdr{padding:10px 12px;flex-wrap:wrap;gap:6px}
+  .shift-name{font-size:13px}
+  .shift-actions{width:100%;display:flex;gap:6px;justify-content:flex-end}
+  .shift-content{padding:10px 8px}
+  .form-row.cols-4{grid-template-columns:1fr 1fr}
+  .tambah-sec{padding:10px}
   .mid-badge{display:none}
+  .inp-num{width:100% !important;min-width:0}
+  .stbl .inp-num{width:70px !important}
+
+  /* ── Pratinjau ── */
+  .preview-section{padding:12px}
+  .preview-title{font-size:13px}
+  .rrow{font-size:12px}
+
+  /* ── Laporan & Rekap ── */
+  .lk-tbl td{padding:5px 8px;font-size:12px}
+  [style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:1fr 1fr !important}
+  [style*="grid-template-columns:1fr 1fr;gap"]{grid-template-columns:1fr !important}
+
+  /* ── Login ── */
+  .login-box{padding:24px 16px;margin:8px;max-width:100%}
+  .login-logo .brand{font-size:20px}
+  .login-tabs{gap:4px}
+  .login-tab{padding:8px;font-size:12px}
+
+  /* ── Database page ── */
+  [style*="grid-template-columns:1fr 1fr 1fr"]{grid-template-columns:1fr !important}
+  .metric{padding:10px}
+
+  /* ── Pengaturan ── */
+  [style*="grid-template-columns:repeat(auto-fill,minmax(340px"]{
+    grid-template-columns:1fr !important
+  }
+  [style*="grid-template-columns:1fr 1fr 1fr;gap:12px"]{
+    grid-template-columns:1fr !important
+  }
+  [style*="grid-template-columns:repeat(auto-fill,minmax(160px"]{
+    grid-template-columns:1fr 1fr !important
+  }
+
+  /* ── Beban Usaha ── */
+  [style*="grid-template-columns:1fr 1fr;gap:12px"]{grid-template-columns:1fr !important}
+
+  /* ── Laporan Stok ── */
+  .stbl[style*="font-size:12px"]{min-width:700px}
 }
 
-/* Force override inline display:flex on mobile */
-@media(max-width:768px){
-  #main-layout[style*="flex"]{
-    flex-direction:column !important;
+/* ── Layar sangat kecil (<400px) ── */
+@media(max-width:400px){
+  .dash-kpi,.bbm-grid,[style*="grid-template-columns:repeat(4"]{
+    grid-template-columns:1fr !important
   }
-  #main-sidebar:not(.mob-open){
-    display:none !important;
-    width:0 !important;
-  }
-  #main-content{
-    width:100% !important;
-    min-width:0 !important;
-    padding:10px !important;
-    overflow-x:hidden !important;
-  }
+  .quick-actions{grid-template-columns:1fr 1fr !important}
+  .form-row.cols-4,.form-row.cols-3,.form-row.cols-2{grid-template-columns:1fr}
+  .main{padding:8px 6px !important}
+  .card{padding:10px}
+  .stbl{min-width:380px;font-size:10px}
+  .stbl th,.stbl td{padding:4px 5px}
+}
+
+
+/* ── Responsive utility ── */
+.rg2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}
+.rg3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.rg4{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.flex-wrap{display:flex;flex-wrap:wrap;gap:8px}
+@media(max-width:480px){
+  .rg2,.rg3{grid-template-columns:1fr}
+  .rg4{grid-template-columns:1fr 1fr}
 }
 
 /* Mobile nav overlay */
@@ -1068,7 +1117,7 @@ function renderDashboardPage(main){
   <div class="dash-greeting">
     <h2>${greetText}, Owner!</h2>
     <p>${now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})}</p>
-    <div class="greet-stats">
+    <div class="greet-stats" style="display:flex;gap:16px;flex-wrap:wrap;margin-top:12px">
       <div class="gs"><span class="gs-label">Data Terakhir</span><span class="gs-val">${todayDate}</span></div>
       <div class="gs"><span class="gs-label">Total Data</span><span class="gs-val">${data.length} hari</span></div>
       <div class="gs"><span class="gs-label">Cloud</span><span class="gs-val" style="font-size:13px">${getCloudUrl()?'● Terhubung':'○ Lokal'}</span></div>
@@ -1205,7 +1254,7 @@ function renderInputPage(main){
   </div>
   <div class="card">
     <div class="card-title">Pilih Shift</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+    <div class="g3" style="gap:12px">
       ${SO.map(sh=>`
       <div onclick="tgSh('${sh}')" style="border:2px solid ${state.sel[sh]?'var(--'+{pagi:'green',siang:'amber',malam:'purple'}[sh]+')':'var(--border)'};background:${state.sel[sh]?'var(--'+{pagi:'green',siang:'amber',malam:'purple'}[sh]+'-bg)':'var(--surface)'};border-radius:var(--radius);padding:14px;cursor:pointer;user-select:none;position:relative;transition:all .15s" id="sc-${sh}">
         <div style="position:absolute;top:8px;right:8px;width:16px;height:16px;border-radius:50%;background:${state.sel[sh]?'var(--'+{pagi:'green',siang:'amber',malam:'purple'}[sh]+')':'var(--border)'};display:flex;align-items:center;justify-content:center;font-size:9px;color:${state.sel[sh]?'#fff':'transparent'}">✓</div>
@@ -1389,7 +1438,7 @@ function renderShifts(){
             <th style="text-align:left;min-width:80px">BBM</th>
             <th>${prev?'Dari '+cap(prev):(isPagi&&BBM.some(b=>getPrevDayStock(tglVal,b)!==null)?'Dari Kemarin':'Stok Awal')}</th>
             <th>Jual 1 (ltr)</th>
-            <th id="${sh}-th-jual2" style="display:none">Jual 2 (ltr)<br><small style="font-weight:400;color:var(--green)">stok tambah</small></th>
+            <th id="${sh}-th-jual2" style="display:none;min-width:80px">Jual 2 (ltr)<br><small style="font-weight:400;color:var(--green)">stok tambah</small></th>
             <th>Stok Catatan Akhir</th>
             <th>Losses / Plus</th>
             <th style="text-align:center">Tangki Habis?</th>
@@ -1546,6 +1595,17 @@ function propagate(fromSh,toSh){
       if(infoEl){infoEl.textContent=`↑ stok akhir ${cap(fromSh)}: ${fN(nilaiAwal)} ltr`;infoEl.style.color=nilaiAwal>0?'var(--blue)':'var(--red)';}
     }
   });calcShift(toSh);
+}
+
+// Tampilkan scroll hint untuk tabel lebar di mobile
+function showScrollHints(){
+  if(window.innerWidth>768)return;
+  document.querySelectorAll('.tbl-wrap').forEach(w=>{
+    if(w.scrollWidth>w.clientWidth){
+      const hint=w.previousElementSibling;
+      if(hint&&hint.id==='scroll-hint')hint.style.display='block';
+    }
+  });
 }
 
 function calcAll(){
@@ -2551,7 +2611,7 @@ function renderLaporanPage(main){
 
   ${!rec?'':`
   <!-- RINGKASAN HARI INI -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px">
+  <div class="g4" style="gap:12px;margin-bottom:12px">
     <div class="card" style="padding:16px;border-top:3px solid var(--green)">
       <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Total Terjual</div>
       <div style="font-size:24px;font-weight:800;color:var(--text)">${fN(hariIni.total.jual)}</div>
@@ -2646,7 +2706,7 @@ function renderLaporanPage(main){
   <!-- RINGKASAN PER PRODUK -->
   <div class="card" style="margin-bottom:12px">
     <div class="card-title">Perbandingan Produk Hari Ini</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+    <div class="g4" style="gap:10px">
     ${BBM.map(b=>{
       const d=hariIni.bbm[b];
       const margin=gHJ(b)-gHPP(b);
@@ -2676,7 +2736,7 @@ function renderLaporanPage(main){
   <!-- ═══ ANALISA 30 HARI ═══ -->
   <div class="card-title" style="padding:16px 0 8px;font-size:14px;font-weight:800;color:var(--text)">📊 Analisa 30 Hari Terakhir (${hist30.length} hari data)</div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">
+  <div class="g3" style="gap:12px;margin-bottom:12px">
 
     <!-- ANALISA 1: Shift sering turun -->
     <div class="card" style="padding:16px">
@@ -2923,7 +2983,7 @@ function renderStokLaporanPage(main){
   </div>
 
   <!-- KARTU RINGKASAN PER BBM -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+  <div class="g4" style="gap:10px;margin-bottom:12px">
   ${BBM.map(b=>{
     const a=akumBBM[b];
     const rataLosses=dataHari.length>0?(a.losses/dataHari.length):0;
@@ -2960,6 +3020,7 @@ function renderStokLaporanPage(main){
         <span style="color:var(--red)">●</span> Kritis (wajib investigasi)
       </div>
     </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:4px;display:none" id="scroll-hint">← Geser kanan untuk lihat lebih →</div>
     <div class="tbl-wrap">
     <table class="stbl" style="font-size:12px">
       <thead>
@@ -3017,7 +3078,7 @@ function renderStokLaporanPage(main){
   </div>
 
   <!-- ANALISA SELISIH & PANDUAN INVESTIGASI -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">
 
     <!-- Panduan Investigasi -->
     <div class="card" style="padding:16px;border-left:4px solid var(--red)">
@@ -3263,7 +3324,7 @@ function renderBebanPage(main){
   </div>
 
   ${bebanMode==='input'?`
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
 
     <!-- FORM TAMBAH -->
     <div class="card" style="padding:16px">
@@ -3674,7 +3735,7 @@ function renderLabaRugiPage(main){
   </div>
 
   <!-- SUMBER DATA -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:12px">
     <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);padding:10px 14px;font-size:12px">
       <span style="font-weight:700;color:var(--blue)">📊 Sumber Pendapatan & Losses:</span>
       <span style="color:var(--text2);margin-left:6px">Rekap Penjualan Bulanan — ${hariCount} hari, ${bulanCakupan.length} bulan</span>
@@ -3687,7 +3748,7 @@ function renderLabaRugiPage(main){
   </div>
 
   <!-- KPI CARDS -->
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">
+  <div class="g4" style="gap:10px;margin-bottom:12px">
     ${[
       {l:'Pendapatan Kotor',v:pendapatanKotor,s:fN(totalJualLtr)+' ltr | '+hariCount+' hari',c:'var(--blue)'},
       {l:'Laba Kotor',v:labaKotor,s:'Margin '+(pendapatanKotor>0?(labaKotor/pendapatanKotor*100).toFixed(1):0)+'%',c:'var(--green)'},
@@ -3712,7 +3773,7 @@ function renderLabaRugiPage(main){
 
     <div style="padding:0 4px">
     <table style="width:100%;border-collapse:collapse">
-      <colgroup><col style="width:55%"><col style="width:15%"><col style="width:30%"></colgroup>
+      <colgroup><col style="width:55%"><col style="width:10%"><col style="width:35%"></colgroup>
       <tbody>
 
       <!-- ════ A. PENDAPATAN USAHA ════ -->
@@ -3949,7 +4010,7 @@ function renderRekapPage(main){
       <td colspan="10" style="padding:0">
         <div style="background:var(--surface2);padding:14px 20px;border-top:1px solid var(--border)">
           <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Detail BBM — ${keyLabel}</div>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px">
+          <div class="g4" style="gap:10px">
           ${BBM.map(b=>`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:10px">
             <div style="font-size:11px;font-weight:700;margin-bottom:6px"><span class="tag ${BT[b]}">${BL[b]}</span></div>
             <div style="font-size:12px;color:var(--text2)">Volume: <strong>${fN(r.bbmVol[b])} ltr</strong></div>
@@ -4366,7 +4427,7 @@ function renderPengaturanPage(main){
   const tabProfil=`
   <div class="card" style="margin-bottom:12px">
     <div class="card-title">🏢 Profil SPBU</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px">
       <div class="fg">
         <label>Nama SPBU</label>
         <input type="text" class="inp" id="pg-nama" value="${esc(profil.nama||profil.namaSPBU||'')}" placeholder="cth: SPBU 34.123.01 Mataram">
@@ -4444,7 +4505,7 @@ function renderPengaturanPage(main){
     <div class="card-title">👥 Daftar Pengguna
       <button class="btn btn-primary btn-sm" onclick="window._pgEditUserId=null;pgTab='users';renderPengaturanPage(e('main-content'))">+ Tambah User</button>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:10px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:10px">
       ${userCardList}
     </div>
   </div>
@@ -4483,7 +4544,7 @@ function renderPengaturanPage(main){
           <button class="btn btn-ghost btn-sm" onclick="pgSetMenuPreset()" style="font-size:10px">↺ Default</button>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:6px">
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px">
         ${menuChecks}
       </div>
     </div>
@@ -6041,7 +6102,7 @@ function renderDBPage(main){
     <div class="card-title" style="color:var(--blue)">🔗 Koneksi Database</div>
 
     <!-- Status row -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:14px">
       <div style="background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius);padding:12px">
         <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">☁ Firebase Realtime DB</div>
         <div class="db-badge" style="font-size:12px;font-weight:600">
@@ -6102,7 +6163,7 @@ function renderDBPage(main){
   <!-- BACKUP PANEL -->
   <div class="card" style="margin-bottom:12px;border:2px solid var(--green-light)">
     <div class="card-title" style="color:var(--green)">🛡 Backup & Pemulihan Data</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:14px">
 
       <!-- Export -->
       <div style="background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius);padding:14px">
