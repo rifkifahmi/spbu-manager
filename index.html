@@ -2,7 +2,7 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>SPBU Manager</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
@@ -215,11 +215,134 @@ tr.row-saved{opacity:.8}
 .harga-inp:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(24,95,165,.1)}
 
 /* RESPONSIVE */
+/* ══════════════════ MOBILE RESPONSIVE ══════════════════ */
 @media(max-width:768px){
-  .sidebar{display:none}
-  .main{padding:16px}
+  /* Layout — .layout bukan .main-layout */
+  .sidebar{display:none !important}
+  .main{padding:12px 10px;min-width:0;overflow-x:hidden}
+  .layout{flex-direction:column !important}
+
+  /* Grid */
   .form-row.cols-4{grid-template-columns:1fr 1fr}
+  .form-row.cols-3{grid-template-columns:1fr 1fr}
+  .form-row.cols-2{grid-template-columns:1fr}
   .g4{grid-template-columns:1fr 1fr}
+  .g3{grid-template-columns:1fr 1fr}
+  .g2{grid-template-columns:1fr}
+
+  /* Topbar */
+  .topbar{padding:0 8px;gap:4px;height:48px}
+  .topbar-brand{font-size:13px;flex:1;min-width:0;overflow:hidden}
+  .topbar-brand span:first-child{display:inline}
+  .topbar-info{gap:4px}
+  .db-badge{display:none !important}
+  #tb-date{display:none !important}
+  #backup-status-bar{display:none !important}
+  .user-menu span:not(.user-avatar){display:none}
+  .logout-btn{padding:4px 8px;font-size:10px}
+  #tb-role-badge{display:none}
+
+  /* Page header */
+  .page-header{flex-direction:column;align-items:flex-start;gap:8px}
+  .page-header button,.page-header div:last-child{width:100%}
+
+  /* Tables — horizontal scroll */
+  .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .stbl{min-width:500px;font-size:11px}
+  .stbl th,.stbl td{padding:5px 7px}
+
+  /* Cards */
+  .card{padding:12px}
+  .card-title{font-size:13px}
+
+  /* Shift input */
+  .shift-block{margin-bottom:12px}
+  .shift-hdr{padding:10px 12px}
+  .shift-content{padding:10px}
+
+  /* Form fields */
+  .inp{font-size:14px;padding:10px 12px} /* bigger touch targets */
+  .btn{padding:9px 14px;font-size:12px}
+  .btn-sm{padding:6px 10px;font-size:11px}
+
+  /* BBM grid */
+  .bbm-grid{grid-template-columns:1fr 1fr}
+  .dash-kpi{grid-template-columns:1fr 1fr}
+
+  /* Pratinjau */
+  .preview-section{padding:12px}
+
+  /* KPI cards */
+  .kpi-value{font-size:16px}
+
+  /* Snav tabs */
+  .snav{flex-wrap:wrap}
+  .snav-btn{font-size:11px;padding:5px 10px}
+
+  /* Login */
+  .login-box{padding:28px 20px;margin:12px}
+  .login-box .form-row{grid-template-columns:1fr}
+
+  /* Hamburguer menu button */
+  .mob-menu-btn{display:flex !important}
+
+  /* Tambah sec */
+  .tambah-sec{padding:10px}
+
+  /* Mid-shift badge */
+  .mid-badge{display:none}
+}
+
+/* Force override inline display:flex on mobile */
+@media(max-width:768px){
+  #main-layout[style*="flex"]{
+    flex-direction:column !important;
+  }
+  #main-sidebar:not(.mob-open){
+    display:none !important;
+    width:0 !important;
+  }
+  #main-content{
+    width:100% !important;
+    min-width:0 !important;
+    padding:10px !important;
+    overflow-x:hidden !important;
+  }
+}
+
+/* Mobile nav overlay */
+.mob-menu-btn{
+  display:none;
+  align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:8px;
+  background:rgba(255,255,255,.1);border:none;
+  cursor:pointer;color:#fff;font-size:18px;
+  margin-right:8px
+}
+.sidebar-overlay{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.5);z-index:199
+}
+.sidebar-overlay.show{display:block}
+.sidebar.mob-open{
+  display:flex !important;
+  flex-direction:column;
+  position:fixed;left:0;top:0;bottom:0;z-index:200;
+  width:240px;min-width:240px;
+  box-shadow:4px 0 20px rgba(0,0,0,.3);
+  overflow-y:auto
+}
+
+/* ══════════════════ PRINT STYLES ══════════════════════ */
+@media print{
+  .sidebar,.topbar,.mob-menu-btn,.sidebar-overlay{display:none!important}
+  .main{padding:0;margin:0}
+  .layout{display:block !important}
+  .btn,.snav,.page-header button{display:none!important}
+  .card{border:1px solid #ddd;box-shadow:none;break-inside:avoid}
+  .tbl-wrap{overflow:visible}
+  body{background:#fff;color:#000}
+  @page{margin:1.5cm;size:A4}
 }
 
 /* CHART */
@@ -361,6 +484,7 @@ tr.row-saved{opacity:.8}
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 </head>
 <body>
+<div class="sidebar-overlay" id="mob-overlay" onclick="toggleMobileNav()"></div>
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen" class="login-screen">
@@ -394,6 +518,7 @@ tr.row-saved{opacity:.8}
 
 <!-- TOPBAR -->
 <div class="topbar" id="main-topbar" style="display:none">
+  <button class="mob-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">☰</button>
   <div class="topbar-brand">
     <span>SPBU</span> Manager
     <span id="tb-role-badge" class="role-badge role-owner" style="font-size:10px"></span>
@@ -401,7 +526,8 @@ tr.row-saved{opacity:.8}
   <div class="topbar-info">
     <div class="db-badge"><span class="db-dot"></span> LocalStorage Active</div>
     <span id="tb-date" style="font-size:12px;color:rgba(255,255,255,.5)"></span>
-    <div class="user-menu">
+    <div id="backup-status-bar" style="font-size:11px;color:rgba(255,255,255,.6);display:none;align-items:center;margin-right:12px"></div>
+  <div class="user-menu">
       <div class="user-avatar" id="tb-avatar">O</div>
       <button class="logout-btn" onclick="doLogout()">Keluar</button>
     </div>
@@ -641,7 +767,13 @@ function userHasMenu(menuId){
 function showApp(){
   document.getElementById('login-screen').style.display='none';
   document.getElementById('main-topbar').style.display='flex';
-  document.getElementById('main-layout').style.display='flex';
+  // Set display flex tapi biarkan CSS media query handle column/row
+  const layoutEl=document.getElementById('main-layout');
+  if(layoutEl)layoutEl.style.display='flex';
+  // Tampilkan backup status di topbar
+  const bsb=document.getElementById('backup-status-bar');
+  if(bsb)bsb.style.display='flex';
+  updateBackupStatus();
   // Update topbar brand
   const profil=getProfil();
   const brandEl=document.querySelector('.topbar-brand');
@@ -712,7 +844,7 @@ let currentPage='input';
 let histChartInst=null;
 
 // ─── LOCALSTORAGE ────────────────────────────────────────────
-function dbSave(){try{localStorage.setItem(DB_KEY,JSON.stringify(state));}catch(err){toast('⚠ Gagal menyimpan ke database: '+err.message);}}
+function dbSave(){try{localStorage.setItem(DB_KEY,JSON.stringify(state));setTimeout(()=>{try{autoBackupLocal();}catch(e){}},100);}catch(err){toast('⚠ Gagal menyimpan ke database: '+err.message);}}
 function dbLoad(){
   try{
     const d=localStorage.getItem(DB_KEY);
@@ -824,6 +956,11 @@ function calcRow(awal,jual,tambah,habis,jual2=0){
 
 // ─── PAGE ROUTER ─────────────────────────────────────────────
 function showPage(name){
+  // Tutup mobile nav saat halaman berubah
+  const _sb=document.getElementById('main-sidebar');
+  const _ov=document.getElementById('mob-overlay');
+  if(_sb)_sb.classList.remove('mob-open');
+  if(_ov)_ov.classList.remove('show');
   if(!currentUser)return;
   const isOwner=currentUser.role==='owner';
   // Proteksi akses
@@ -1742,6 +1879,7 @@ function showPreview(autoSave=false,update=false){
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">
       <button class="btn btn-ghost" onclick="previewOpen=false;e('form-preview').style.display='none'">Tutup</button>
       <button class="btn btn-save btn-lg" onclick="saveData()">💾 Simpan Data Hari Ini</button>
+    <button class="btn btn-ghost btn-sm" onclick="printLaporanHarian()" style="margin-left:8px">🖨 Print Laporan</button>
     </div>
   </div>`;
   if(!update)setTimeout(()=>pv.scrollIntoView({behavior:'smooth',block:'nearest'}),50);
@@ -5266,6 +5404,327 @@ function updateHarga(b){
 // ════════════════════════════════════════════════════════════
 // PAGE: DATABASE
 // ════════════════════════════════════════════════════════════
+
+
+// ═══════════════════════════════════════════════════════════════
+//  PRINT LAPORAN HARIAN — SIAP CETAK / KIRIM WhatsApp
+// ═══════════════════════════════════════════════════════════════
+function printLaporanHarian(){
+  const tgl=e('f-tanggal')?.value||new Date().toISOString().slice(0,10);
+  const rec=state.savedData.find(d=>d.tanggal===tgl);
+  const profil=getProfil();
+  const hSnap=rec?.hargaSnapshot||null;
+
+  let totalJual=0,totalOmzet=0,totalLaba=0,totalLosses=0;
+  const bbmData=BBM.map(b=>{
+    let jual=0,losses=0,awal=0,akhir=0;
+    const shifts=rec?.shifts||[];
+    if(shifts.length)awal=rec.shiftData[shifts[0]]?.[b]?.awal||0;
+    shifts.forEach(sh=>{const sd=rec?.shiftData[sh]?.[b]||{};jual+=sd.jual||0;losses+=sd.losses||0;});
+    if(shifts.length)akhir=rec?.shiftData[shifts[shifts.length-1]]?.[b]?.stokAkhirEfektif||0;
+    const hj=hSnap?hSnap[b]:gHJ(b);
+    const hpp=hSnap?hSnap['hpp_'+b]:gHPP(b);
+    const omzet=jual*hj;const laba=jual*(hj-hpp);
+    totalJual+=jual;totalOmzet+=omzet;totalLaba+=laba;totalLosses+=losses;
+    return{b,jual,losses,awal,akhir,omzet,laba,hj,hpp,margin:hj-hpp};
+  });
+
+  const biayaTotal=rec?.ops||0;
+  const labaBersih=totalLaba-biayaTotal;
+  const bln=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const [y,m,d]=tgl.split('-');
+  const tglStr=d+' '+bln[parseInt(m)-1]+' '+y;
+  const hariStr=rec?.hari||['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'][new Date(tgl+'T00:00:00').getDay()];
+  const namaSpbu=profil.namaSPBU||profil.nama||'SPBU';
+
+  const css=[
+    '*{box-sizing:border-box;margin:0;padding:0}',
+    'body{font-family:"Times New Roman",serif;font-size:12px;color:#000;background:#fff;padding:20px 24px}',
+    '.hdr{text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:14px}',
+    '.hdr h1{font-size:16px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px}',
+    '.hdr h2{font-size:13px;font-weight:normal;margin-top:4px}',
+    '.hdr p{font-size:11px;color:#444;margin-top:2px}',
+    'table{width:100%;border-collapse:collapse;margin-bottom:12px}',
+    'th{background:#f0f0f0;font-weight:bold;padding:5px 8px;border:1px solid #999;font-size:11px;text-align:left}',
+    'td{padding:5px 8px;border:1px solid #ccc;font-size:12px}',
+    '.r{text-align:right}.c{text-align:center}',
+    '.tot td{font-weight:bold;background:#e8e8e8;border-top:2px solid #999}',
+    '.sec{font-size:12px;font-weight:bold;text-transform:uppercase;background:#333;color:#fff;padding:6px 10px;margin:14px 0 6px}',
+    '.sgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}',
+    '.sbox{border:1px solid #999;padding:10px;text-align:center}',
+    '.sbox .lbl{font-size:10px;text-transform:uppercase;color:#666;font-weight:bold}',
+    '.sbox .val{font-size:16px;font-weight:bold;margin-top:4px}',
+    '.sbox .sub{font-size:10px;color:#666;margin-top:2px}',
+    '.lr td{background:#fff0f0}',
+    '.ftl{margin-top:20px;display:flex;justify-content:space-between}',
+    '.ttd{text-align:center;width:150px}',
+    '.ttd .line{border-top:1px solid #000;margin-top:40px;padding-top:4px;font-size:11px}',
+    '.alrt{background:#fff3cd;border:1px solid #ffc107;padding:6px 10px;font-size:11px;margin-bottom:10px}',
+    '@media print{@page{margin:1.5cm;size:A4}body{padding:0}}'
+  ].join('');
+
+  // Build HTML rows
+  const bbmRows=bbmData.map(d=>{
+    const lossClass=d.losses>0?' class="lr"':'';
+    return '<tr'+lossClass+'>'
+      +'<td><strong>'+BL[d.b]+'</strong></td>'
+      +'<td class="r">'+fN(d.awal)+'</td>'
+      +'<td class="r"><strong>'+fN(d.jual)+'</strong></td>'
+      +'<td class="r">'+fR(d.hj)+'</td>'
+      +'<td class="r">'+fRF(d.omzet)+'</td>'
+      +'<td class="r">'+fR(d.margin)+'</td>'
+      +'<td class="r" style="color:#2D6A2D"><strong>'+fRF(d.laba)+'</strong></td>'
+      +'<td class="r" style="color:'+(d.losses>0?'#c00':'#888')+'">'+(d.losses>0?fN(d.losses)+' ltr':'—')+'</td>'
+      +'<td class="r">'+fN(d.akhir)+'</td>'
+      +'</tr>';
+  }).join('');
+
+  const shiftRows=(rec?.shifts||[]).map(sh=>{
+    const shL={pagi:'Pagi 06-14',siang:'Siang 14-22',malam:'Malam 22-06'};
+    let rowTotal=0;
+    const cells=BBM.map(b=>{const v=rec.shiftData[sh]?.[b]?.jual||0;rowTotal+=v;return '<td class="r">'+fN(v)+'</td>';}).join('');
+    return '<tr><td><strong>'+(shL[sh]||sh)+'</strong></td>'+cells+'<td class="r"><strong>'+fN(rowTotal)+'</strong></td></tr>';
+  }).join('');
+
+  const biayaRows=(rec?.biayaItems||[]).map(i=>'<tr><td>'+esc(i.ket)+'</td><td>'+(CATS[i.cat]?.label||i.cat)+'</td><td class="r">Rp '+fN(i.nom)+'</td></tr>').join('');
+
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Laporan Harian '+tglStr+'</title>'
+    +'<style>'+css+'</style></head><body>'
+    +'<div class="hdr"><h1>'+namaSpbu+'</h1><h2>LAPORAN PENJUALAN HARIAN</h2>'
+    +'<p>'+(profil.alamat||'')+' '+(profil.telp?'| Tel: '+profil.telp:'')+'</p>'
+    +'<p style="font-weight:bold;margin-top:4px">'+hariStr+', '+tglStr+'</p></div>'
+    +(rec?''
+      +'<div class="sgrid">'
+      +'<div class="sbox"><div class="lbl">Total Terjual</div><div class="val">'+fN(totalJual)+'</div><div class="sub">Liter</div></div>'
+      +'<div class="sbox"><div class="lbl">Total Omzet</div><div class="val">'+fRF(totalOmzet)+'</div><div class="sub">Pendapatan Kotor</div></div>'
+      +'<div class="sbox"><div class="lbl">Laba Bersih</div><div class="val" style="color:'+(labaBersih>=0?'#2D6A2D':'#c00')+'">'+fRF(labaBersih)+'</div><div class="sub">Setelah biaya</div></div>'
+      +'</div>'
+      +'<div class="sec">Rincian per Produk</div>'
+      +'<table><thead><tr>'
+      +'<th>Produk</th><th class="r">Stok Awal</th><th class="r">Terjual</th><th class="r">Harga/ltr</th><th class="r">Omzet</th><th class="r">Margin</th><th class="r">Laba</th><th class="r">Losses</th><th class="r">Stok Akhir</th>'
+      +'</tr></thead><tbody>'+bbmRows+'</tbody>'
+      +'<tfoot><tr class="tot"><td><strong>TOTAL</strong></td><td></td>'
+      +'<td class="r"><strong>'+fN(totalJual)+' ltr</strong></td><td></td>'
+      +'<td class="r"><strong>'+fRF(totalOmzet)+'</strong></td><td></td>'
+      +'<td class="r" style="color:#2D6A2D"><strong>'+fRF(totalLaba)+'</strong></td>'
+      +'<td class="r" style="color:#c00"><strong>'+(totalLosses>0?fN(totalLosses)+' ltr':'—')+'</strong></td>'
+      +'<td></td></tr></tfoot></table>'
+      +(shiftRows?'<div class="sec">Rincian per Shift</div>'
+        +'<table><thead><tr><th>Shift</th>'+BBM.map(b=>'<th class="r">'+BL[b]+' (ltr)</th>').join('')+'<th class="r">Total</th></tr></thead>'
+        +'<tbody>'+shiftRows+'</tbody></table>':'')
+      +(biayaRows?'<div class="sec">Biaya Operasional</div>'
+        +'<table><thead><tr><th>Keterangan</th><th>Kategori</th><th class="r">Nominal</th></tr></thead>'
+        +'<tbody>'+biayaRows+'</tbody>'
+        +'<tfoot><tr class="tot"><td colspan="2"><strong>Total Biaya</strong></td><td class="r"><strong>Rp '+fN(biayaTotal)+'</strong></td></tr></tfoot></table>':'')
+      +'<table><tbody>'
+      +'<tr><td>Laba Kotor</td><td class="r">'+fRF(totalLaba)+'</td></tr>'
+      +'<tr style="color:#c00"><td>Biaya Operasional</td><td class="r">-'+fRF(biayaTotal)+'</td></tr>'
+      +'<tr class="tot"><td><strong>LABA BERSIH HARI INI</strong></td><td class="r" style="color:'+(labaBersih>=0?'#2D6A2D':'#c00')+'"><strong>'+fRF(labaBersih)+'</strong></td></tr>'
+      +'</tbody></table>'
+      +(totalLosses>50?'<div class="alrt">&#9888; Losses hari ini '+fN(totalLosses)+' liter melebihi toleransi normal. Harap diperiksa.</div>':'')
+      :'<p style="text-align:center;color:red;padding:20px">&#9888; Belum ada data untuk tanggal ini</p>')
+    +'<div class="ftl">'
+    +'<div class="ttd"><div class="line">Diperiksa,</div><div style="font-size:11px;margin-top:2px">Manager</div></div>'
+    +'<div style="text-align:center;font-size:10px;color:#888;align-self:flex-end">Dicetak: '+new Date().toLocaleString('id-ID')+'<br>SPBU Manager</div>'
+    +'<div class="ttd"><div class="line">Mengetahui,</div><div style="font-size:11px;margin-top:2px">Owner</div></div>'
+    +'</div></body></html>';
+
+  const w=window.open('','_blank','width=800,height=900');
+  w.document.write(html);
+  w.document.close();
+  setTimeout(()=>w.print(),600);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//  SISTEM BACKUP OTOMATIS — MULTI-LAYER
+//  Layer 1: localStorage (primary, instant)
+//  Layer 2: Auto-export JSON harian (download file)
+//  Layer 3: Google Sheets via Apps Script (cloud)
+// ═══════════════════════════════════════════════════════════════
+
+const BACKUP_KEY     = 'spbu_backup_v1';      // backup harian di localStorage
+const BACKUP_LOG_KEY = 'spbu_backup_log';      // log waktu backup terakhir
+const BACKUP_COPY_KEY= 'spbu_backup_copy';     // salinan kedua (berbeda key)
+
+// ── Auto-backup ke localStorage (layer 1 + snapshot copy) ───
+function autoBackupLocal(){
+  try{
+    const snapshot=JSON.stringify({
+      savedData: state.savedData,
+      bebanUsaha: state.bebanUsaha||[],
+      harga: state.harga,
+      riwayatHarga: state.riwayatHarga||[],
+      backedUpAt: new Date().toISOString(),
+      version: 2
+    });
+    // Simpan di dua key berbeda (lindungi dari korupsi salah satu)
+    localStorage.setItem(BACKUP_KEY, snapshot);
+    // Rotasi: simpan snapshot kemarin sebagai backup copy
+    const prev=localStorage.getItem(BACKUP_KEY);
+    if(prev)localStorage.setItem(BACKUP_COPY_KEY, prev);
+    // Update log
+    const log=JSON.parse(localStorage.getItem(BACKUP_LOG_KEY)||'{}');
+    log.lastLocal=new Date().toISOString();
+    log.count=(log.count||0)+1;
+    log.dataRows=state.savedData.length;
+    localStorage.setItem(BACKUP_LOG_KEY, JSON.stringify(log));
+    updateBackupStatus();
+    return true;
+  }catch(e){
+    console.error('Backup local failed:', e);
+    return false;
+  }
+}
+
+// ── Pulihkan dari backup jika data utama korup/kosong ───────
+function checkAndRestoreBackup(){
+  // Jika data utama kosong tapi backup ada, tawarkan restore
+  if(state.savedData.length===0){
+    try{
+      const bk=JSON.parse(localStorage.getItem(BACKUP_KEY)||'{}');
+      if(bk.savedData&&bk.savedData.length>0){
+        if(confirm(`⚠ Data utama kosong!\nDitemukan backup ${bk.savedData.length} hari data (${new Date(bk.backedUpAt).toLocaleString('id-ID')}).\n\nPulihkan data dari backup?`)){
+          state.savedData=bk.savedData;
+          if(bk.bebanUsaha)state.bebanUsaha=bk.bebanUsaha;
+          if(bk.harga)state.harga={...state.harga,...bk.harga};
+          dbSave();
+          toast('✓ Data berhasil dipulihkan dari backup! ('+bk.savedData.length+' hari)');
+          return true;
+        }
+      }
+    }catch(e){}
+  }
+  return false;
+}
+
+// ── Export JSON ke file (download) ──────────────────────────
+function exportBackupJSON(){
+  const data={
+    savedData:state.savedData,
+    bebanUsaha:state.bebanUsaha||[],
+    harga:state.harga,
+    riwayatHarga:state.riwayatHarga||[],
+    profil:getProfil(),
+    exportedAt:new Date().toISOString(),
+    version:2,
+    info:'SPBU Manager Backup — jangan edit manual'
+  };
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const tgl=new Date().toISOString().slice(0,10);
+  const profil=getProfil();
+  const nama=(profil.noSpbu||'SPBU').replace(/\./g,'-');
+  a.href=url;a.download=`backup-${nama}-${tgl}.json`;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);URL.revokeObjectURL(url);
+  // Update log
+  const log=JSON.parse(localStorage.getItem(BACKUP_LOG_KEY)||'{}');
+  log.lastExport=new Date().toISOString();
+  localStorage.setItem(BACKUP_LOG_KEY,JSON.stringify(log));
+  updateBackupStatus();
+  toast('✓ File backup berhasil diunduh!');
+}
+
+// ── Import dari file JSON ────────────────────────────────────
+function importBackupJSON(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const data=JSON.parse(e.target.result);
+      if(!data.savedData||!Array.isArray(data.savedData)){
+        toast('⚠ File backup tidak valid!');return;
+      }
+      const n=data.savedData.length;
+      if(!confirm(`Import ${n} hari data dari file backup?\n(Data yang ada akan digabung, data duplikat tanggal akan ditimpa)`))return;
+      // Merge: existing + imported, deduplicate by tanggal
+      const merged={};
+      state.savedData.forEach(d=>merged[d.tanggal]=d);
+      data.savedData.forEach(d=>merged[d.tanggal]=d);
+      state.savedData=Object.values(merged).sort((a,b)=>a.tanggal>b.tanggal?-1:1);
+      if(data.bebanUsaha)state.bebanUsaha=[...(state.bebanUsaha||[]),...(data.bebanUsaha||[])];
+      if(data.harga)state.harga={...state.harga,...data.harga};
+      dbSave();autoBackupLocal();
+      toast('✓ Import berhasil! '+state.savedData.length+' hari data tersedia.');
+      showPage(currentPage||'dashboard');
+    }catch(err){toast('⚠ Gagal membaca file: '+err.message);}
+  };
+  reader.readAsText(file);
+}
+
+// ── Update status backup di UI ───────────────────────────────
+function updateBackupStatus(){
+  const log=JSON.parse(localStorage.getItem(BACKUP_LOG_KEY)||'{}');
+  const bk=JSON.parse(localStorage.getItem(BACKUP_KEY)||'{}');
+  const isCloud=!!getCloudUrl();
+  const lastLocal=log.lastLocal?new Date(log.lastLocal).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'Belum pernah';
+  const lastExport=log.lastExport?new Date(log.lastExport).toLocaleString('id-ID',{day:'numeric',month:'short'}):'—';
+  const copyOk=!!localStorage.getItem(BACKUP_COPY_KEY);
+  const rows=bk.savedData?.length||state.savedData.length||0;
+
+  // Update topbar status bar
+  const el=document.getElementById('backup-status-bar');
+  if(el){
+    el.innerHTML='<span style="font-size:11px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+      +'<span>💾 <strong>Lokal:</strong> '+lastLocal+'</span>'
+      +'<span style="color:'+(isCloud?'var(--green)':'var(--amber)')+'">☁ <strong>Cloud:</strong> '+(isCloud?'Aktif':'Belum diatur')+'</span>'
+      +'<span>📥 <strong>Export:</strong> '+lastExport+'</span>'
+      +'<span style="color:var(--text3)">'+rows+' hari</span>'
+      +'</span>';
+  }
+
+  // Update panel di halaman Database
+  const el2=document.getElementById('backup-status-db');
+  if(el2){
+    el2.innerHTML=''
+      +'<div><span style="color:'+(rows>0?'var(--green)':'var(--amber)')+'">'+( rows>0?'✓':'○')+'</span>'
+      +' <strong>Auto-backup lokal:</strong> '+lastLocal+' ('+rows+' hari)</div>'
+      +'<div><span style="color:'+(copyOk?'var(--green)':'var(--amber)')+'">'+( copyOk?'✓':'⚠')+'</span>'
+      +' <strong>Salinan cadangan:</strong> '+(copyOk?'Ada':'Belum ada')+'</div>'
+      +'<div><span style="color:'+(log.lastExport?'var(--green)':'var(--red)')+'">'+( log.lastExport?'✓':'✗')+'</span>'
+      +' <strong>Export terakhir:</strong> '+lastExport+'</div>'
+      +'<div><span style="color:'+(isCloud?'var(--green)':'var(--amber)')+'">'+( isCloud?'✓':'○')+'</span>'
+      +' <strong>Cloud sync:</strong> '+(isCloud?'Terhubung':'Belum diatur')+'</div>';
+  }
+}
+
+// ── Auto-backup terjadwal setiap 30 menit ───────────────────
+let _backupInterval=null;
+function startAutoBackup(){
+  if(_backupInterval)clearInterval(_backupInterval);
+  autoBackupLocal(); // langsung backup saat start
+  _backupInterval=setInterval(()=>{
+    autoBackupLocal();
+    // Coba cloud sync jika terhubung dan ada data baru
+    if(getCloudUrl()&&state.savedData.length>0){
+      const log=JSON.parse(localStorage.getItem(BACKUP_LOG_KEY)||'{}');
+      const lastCloud=log.lastCloud?new Date(log.lastCloud):new Date(0);
+      const minsAgo=(Date.now()-lastCloud)/60000;
+      if(minsAgo>60){ // sync cloud tiap 1 jam
+        cloudSyncSilent();
+      }
+    }
+  },30*60*1000); // 30 menit
+}
+
+// ── Cloud sync diam-diam (tanpa toast) ──────────────────────
+async function cloudSyncSilent(){
+  const url=getCloudUrl();if(!url)return;
+  try{
+    for(const rec of state.savedData.slice(0,7)){ // sync 7 hari terakhir
+      await cloudSave(rec);
+    }
+    const log=JSON.parse(localStorage.getItem(BACKUP_LOG_KEY)||'{}');
+    log.lastCloud=new Date().toISOString();
+    localStorage.setItem(BACKUP_LOG_KEY,JSON.stringify(log));
+    updateBackupStatus();
+  }catch(e){}
+}
+
+// ── Override dbSave untuk auto-backup ───────────────────────
+// auto-backup terintegrasi di dbSave utama
+
 // ─── CLOUD SYNC ──────────────────────────────────────────────
 const CLOUD_KEY='spbu_cloud_url';
 function getCloudUrl(){return localStorage.getItem(CLOUD_KEY)||'';}
@@ -5355,9 +5814,11 @@ function renderDBPage(main){
         <div class="metric-sub">Hanya tersimpan lokal</div>
       </div>`;
 
+  // Update status
+  updateBackupStatus();
   main.innerHTML=`
   <div class="page-header">
-    <div class="page-title">Database & Cloud Sync</div>
+    <div class="page-title">💾 Database & Backup</div>
     <div class="page-sub">Kelola penyimpanan lokal dan sinkronisasi ke Google Sheets</div>
   </div>
 
@@ -5367,6 +5828,40 @@ function renderDBPage(main){
     <div class="metric"><div class="metric-label">Ukuran Lokal</div><div class="metric-value">${dbSizeKb} KB</div><div class="metric-sub">localStorage</div></div>
     <div class="metric"><div class="metric-label">Mode</div><div class="metric-value" style="font-size:13px">${isCloud?'☁ Cloud+Lokal':'💾 Lokal Only'}</div></div>
     ${cloudStatusHtml}
+  </div>
+
+  <!-- BACKUP PANEL -->
+  <div class="card" style="margin-bottom:12px;border:2px solid var(--green-light)">
+    <div class="card-title" style="color:var(--green)">🛡 Backup & Pemulihan Data</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+
+      <!-- Export -->
+      <div style="background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius);padding:14px">
+        <div style="font-weight:700;font-size:13px;color:var(--green);margin-bottom:6px">📥 Export Backup</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Unduh semua data sebagai file JSON. Simpan di HP atau Google Drive Anda.</div>
+        <button class="btn btn-primary btn-sm" onclick="exportBackupJSON()" style="width:100%">⬇ Download Backup Sekarang</button>
+      </div>
+
+      <!-- Import -->
+      <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);padding:14px">
+        <div style="font-weight:700;font-size:13px;color:var(--blue);margin-bottom:6px">📤 Import / Pulihkan</div>
+        <div style="font-size:12px;color:var(--text2);margin-bottom:10px">Pulihkan data dari file backup JSON yang pernah didownload.</div>
+        <label style="display:block;width:100%">
+          <span class="btn btn-ghost btn-sm" style="width:100%;display:block;text-align:center;cursor:pointer">⬆ Pilih File Backup (.json)</span>
+          <input type="file" accept=".json" onchange="importBackupJSON(this.files[0])" style="display:none">
+        </label>
+      </div>
+    </div>
+
+    <!-- Status backup -->
+    <div style="background:var(--surface2);border-radius:var(--radius);padding:10px 14px;font-size:12px">
+      <div style="font-weight:700;color:var(--text2);margin-bottom:6px;text-transform:uppercase;font-size:10px;letter-spacing:.06em">Status Perlindungan Data</div>
+      <div id="backup-status-db"></div>
+    </div>
+
+    <div style="margin-top:10px;padding:8px 12px;background:var(--amber-bg);border-radius:var(--radius);font-size:11px;color:var(--amber)">
+      💡 <strong>Rekomendasi:</strong> Download backup setiap akhir bulan dan simpan di Google Drive atau WhatsApp ke diri sendiri. Auto-backup lokal aktif setiap 30 menit.
+    </div>
   </div>
 
   <!-- CLOUD SETUP -->
@@ -5687,8 +6182,21 @@ function gantiPassword(){
   toast('✓ Password berhasil diperbarui!');
 }
 
+function toggleMobileNav(){
+  const sb=document.getElementById('main-sidebar');
+  const ov=document.getElementById('mob-overlay');
+  if(!sb||!ov)return;
+  const isOpen=sb.classList.contains('mob-open');
+  if(isOpen){sb.classList.remove('mob-open');ov.classList.remove('show');}
+  else{sb.classList.add('mob-open');ov.classList.add('show');}
+}
+// Tutup mobile nav saat menu dipilih
+// mobile nav close integrated in toggleMobileNav
+
 function init(){
   dbLoad();
+  checkAndRestoreBackup();  // Cek dan tawarkan restore jika data kosong
+  startAutoBackup();         // Mulai auto-backup berkala
   const now=new Date();
   const tb=e('tb-date');
   if(tb)tb.textContent=now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
