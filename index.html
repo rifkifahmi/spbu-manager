@@ -648,7 +648,50 @@ tr.row-saved{opacity:.8}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 // ─── CONSTANTS ──────────────────────────────────────────────
-const BBM=['pertalite','pertamax','dexlite','biosolar'];
+// ── Konfigurasi Produk BBM — bisa diubah dari menu Pengaturan ──
+const BBM_DEFAULT=[
+  {id:'pertalite', label:'Pertalite',    tag:'tp', batas:3000, hj:10000, mg:200},
+  {id:'pertamax',  label:'Pertamax',     tag:'tx', batas:2000, hj:13200, mg:300},
+  {id:'dexlite',   label:'Dexlite',      tag:'td', batas:1500, hj:14550, mg:350},
+  {id:'biosolar',  label:'Biosolar',     tag:'tb', batas:3000, hj:6800,  mg:200},
+];
+const BBM_KEY='spbu_bbm_config';
+
+function loadBBMConfig(){
+  try{
+    const saved=localStorage.getItem(BBM_KEY);
+    if(saved) return JSON.parse(saved);
+  }catch(e){}
+  return BBM_DEFAULT;
+}
+function saveBBMConfig(cfg){
+  localStorage.setItem(BBM_KEY,JSON.stringify(cfg));
+  // Update variabel global
+  _rebuildBBMGlobals(cfg);
+  // Sync ke Firebase
+  if(_fbInited) fbSaveAppState().catch(()=>{});
+}
+function _rebuildBBMGlobals(cfg){
+  // Rebuild semua konstanta dari config
+  BBM.length=0;
+  Object.keys(BL).forEach(k=>delete BL[k]);
+  Object.keys(BT).forEach(k=>delete BT[k]);
+  Object.keys(BATAS).forEach(k=>delete BATAS[k]);
+  cfg.filter(p=>p.aktif!==false).forEach(p=>{
+    BBM.push(p.id);
+    BL[p.id]=p.label;
+    BT[p.id]=p.tag||'tp';
+    BATAS[p.id]=p.batas||1000;
+    // Update harga default jika belum ada
+    if(!state.harga[p.id]){
+      state.harga[p.id]=p.hj||10000;
+      state.harga['hpp_'+p.id]=(p.hj||10000)-(p.mg||200);
+    }
+  });
+}
+
+// Variabel global yang bisa di-mutate
+let BBM=['pertalite','pertamax','dexlite','biosolar'];
 const BL={pertalite:'Pertalite',pertamax:'Pertamax',dexlite:'Dexlite',biosolar:'Biosolar'};
 const BT={pertalite:'tp',pertamax:'tx',dexlite:'td',biosolar:'tb'};
 const BATAS={pertalite:3000,pertamax:2000,dexlite:1500,biosolar:3000};
@@ -897,6 +940,9 @@ let histChartInst=null;
 function dbSave(){try{localStorage.setItem(DB_KEY,JSON.stringify(state));setTimeout(()=>{try{autoBackupLocal();}catch(e){}},100);}catch(err){toast('⚠ Gagal menyimpan ke database: '+err.message);}}
 function dbLoad(){
   try{
+    // Muat konfigurasi BBM DULU
+    const bbmCfg=loadBBMConfig();
+    _rebuildBBMGlobals(bbmCfg);
     // Muat harga dari localStorage terpisah DULU (paling cepat)
     loadHargaLocal();
     const d=localStorage.getItem(DB_KEY);
@@ -4431,6 +4477,227 @@ function printRekap(){
 // ════════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════════
+//  MANAJEMEN PRODUK BBM
+// ═══════════════════════════════════════════════════════════════
+let pgProdukEdit = null; // id produk yang sedang diedit
+
+const TAG_OPTIONS = [
+  {val:'tp', label:'Hijau',  color:'#2D6A2D', bg:'#EAF3DE'},
+  {val:'tx', label:'Biru',   color:'#185FA5', bg:'#E6F1FB'},
+  {val:'td', label:'Kuning', color:'#854F0B', bg:'#FAEEDA'},
+  {val:'tb', label:'Ungu',   color:'#534AB7', bg:'#EEEDFE'},
+  {val:'tm', label:'Merah',  color:'#A32D2D', bg:'#FCEAEA'},
+  {val:'tn', label:'Abu',    color:'#5F5E5A', bg:'#F1EFE8'},
+];
+
+function renderTabProduk(){
+  const cfg=loadBBMConfig();
+
+  const tagOpts=TAG_OPTIONS.map(t=>
+    `<option value="${t.val}">${t.label}</option>`
+  ).join('');
+
+  const editItem=pgProdukEdit!=null?cfg.find(p=>p.id===pgProdukEdit):null;
+
+  const daftarProduk=cfg.map((p,i)=>{
+    const tag=TAG_OPTIONS.find(t=>t.val===p.tag)||TAG_OPTIONS[0];
+    const aktif=p.aktif!==false;
+    const isDefault=['pertalite','pertamax','dexlite','biosolar'].includes(p.id);
+    return`<div style="background:var(--surface);border:1px solid ${pgProdukEdit===p.id?'var(--blue)':'var(--border)'};border-radius:var(--radius-lg);padding:14px 16px;${!aktif?'opacity:.6':''}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:10px;height:32px;border-radius:3px;background:${tag.color}"></div>
+          <div>
+            <div style="font-weight:700;font-size:14px">${esc(p.label)}</div>
+            <div style="font-size:11px;color:var(--text2)">ID: ${p.id} &nbsp;·&nbsp;
+              <span class="tag ${p.tag}" style="font-size:10px">${esc(p.label)}</span>
+              ${!aktif?'<span style="color:var(--red);font-size:10px;margin-left:4px">● Nonaktif</span>':''}
+              ${isDefault?'<span style="font-size:10px;color:var(--text3);margin-left:4px">Produk bawaan</span>':''}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="btn btn-ghost btn-sm" onclick="pgProdukEdit='${p.id}';pgTab='produk';renderPengaturanPage(e('main-content'))" style="font-size:11px">✏ Edit</button>
+          <button class="btn btn-ghost btn-sm" onclick="pgToggleProduk('${p.id}')" style="font-size:11px;color:${aktif?'var(--amber)':'var(--green)'}">
+            ${aktif?'⊘ Nonaktifkan':'✓ Aktifkan'}
+          </button>
+          ${!isDefault?`<button class="btn btn-del btn-sm" onclick="pgHapusProduk('${p.id}')" style="font-size:11px">🗑</button>`:''}
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:12px">
+        <div style="background:var(--surface2);padding:8px;border-radius:6px">
+          <div style="color:var(--text3);font-size:10px;text-transform:uppercase">Harga Jual</div>
+          <div style="font-weight:700">Rp ${fN(state.harga[p.id]||p.hj||0)}</div>
+        </div>
+        <div style="background:var(--surface2);padding:8px;border-radius:6px">
+          <div style="color:var(--text3);font-size:10px;text-transform:uppercase">HPP</div>
+          <div style="font-weight:700">Rp ${fN(state.harga['hpp_'+p.id]||((p.hj||0)-(p.mg||0)))}</div>
+        </div>
+        <div style="background:var(--green-bg);padding:8px;border-radius:6px">
+          <div style="color:var(--text3);font-size:10px;text-transform:uppercase">Margin</div>
+          <div style="font-weight:700;color:var(--green)">Rp ${fN((state.harga[p.id]||p.hj||0)-(state.harga['hpp_'+p.id]||((p.hj||0)-(p.mg||0))))}/ltr</div>
+        </div>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text2)">
+        Batas stok rendah: <strong>${fN(p.batas||1000)} ltr</strong>
+        &nbsp;|&nbsp; Urutan: ${i+1}
+        <button onclick="pgNaikProduk(${i})" ${i===0?'disabled':''} style="background:none;border:none;cursor:pointer;padding:0 4px;color:var(--text2)">▲</button>
+        <button onclick="pgTurunProduk(${i})" ${i===cfg.length-1?'disabled':''} style="background:none;border:none;cursor:pointer;padding:0 4px;color:var(--text2)">▼</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  return`
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">⛽ Daftar Produk BBM</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-bottom:12px">
+      ${daftarProduk}
+    </div>
+    <div style="padding:8px 12px;background:var(--surface2);border-radius:var(--radius);font-size:11px;color:var(--text2)">
+      💡 Produk bawaan (Pertalite, Pertamax, Dexlite, Biosolar) tidak bisa dihapus tapi bisa dinonaktifkan.
+      Perubahan harga tetap dikelola di menu <strong>Harga BBM</strong>.
+    </div>
+  </div>
+
+  <!-- Form tambah/edit produk -->
+  <div class="card" style="border:2px solid var(--blue-light)">
+    <div class="card-title" style="color:var(--blue)">${editItem?'✏ Edit — '+esc(editItem.label):'➕ Tambah Produk BBM Baru'}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">
+      <div class="fg">
+        <label>Nama Produk</label>
+        <input type="text" class="inp" id="pg-bbm-label" value="${esc(editItem?.label||'')}" placeholder="cth: Pertamax Turbo">
+      </div>
+      <div class="fg">
+        <label>ID (huruf kecil, tanpa spasi)</label>
+        <input type="text" class="inp" id="pg-bbm-id" value="${editItem?.id||''}"
+          placeholder="cth: pertamax_turbo" ${editItem?'readonly style="opacity:.6"':''}
+          oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9_]/g,'')">
+      </div>
+      <div class="fg">
+        <label>Warna Badge</label>
+        <select class="inp" id="pg-bbm-tag">
+          ${TAG_OPTIONS.map(t=>`<option value="${t.val}" ${editItem?.tag===t.val?'selected':''}>${t.label}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fg">
+        <label>Harga Jual (Rp)</label>
+        <input type="text" class="inp inp-num" id="pg-bbm-hj" value="${editItem?fN(state.harga[editItem.id]||editItem.hj||0):''}" placeholder="0" oninput="fmtB(this)">
+      </div>
+      <div class="fg">
+        <label>Margin / ltr (Rp)</label>
+        <input type="text" class="inp inp-num" id="pg-bbm-mg" value="${editItem?fN((state.harga[editItem.id]||editItem.hj||0)-(state.harga['hpp_'+editItem.id]||((editItem.hj||0)-(editItem.mg||0)))):''}" placeholder="0" oninput="fmtB(this)">
+      </div>
+      <div class="fg">
+        <label>Batas Stok Rendah (ltr)</label>
+        <input type="text" class="inp inp-num" id="pg-bbm-batas" value="${editItem?fN(editItem.batas||1000):''}" placeholder="1000" oninput="fmtB(this)">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      ${editItem?`<button class="btn btn-ghost" onclick="pgProdukEdit=null;renderPengaturanPage(e('main-content'))">Batal</button>`:''}
+      <button class="btn btn-primary" onclick="${editItem?`pgSimpanProduk('${editItem.id}')`:'pgTambahProduk()'}">
+        💾 ${editItem?'Simpan Perubahan':'Tambah Produk'}
+      </button>
+    </div>
+  </div>`;
+}
+
+function pgTambahProduk(){
+  const label=(e('pg-bbm-label')?.value||'').trim();
+  const id=(e('pg-bbm-id')?.value||'').trim();
+  const tag=e('pg-bbm-tag')?.value||'tp';
+  const hj=parseInt((e('pg-bbm-hj')?.value||'0').replace(/\./g,''))||0;
+  const mg=parseInt((e('pg-bbm-mg')?.value||'0').replace(/\./g,''))||0;
+  const batas=parseInt((e('pg-bbm-batas')?.value||'1000').replace(/\./g,''))||1000;
+
+  if(!label){toast('⚠ Nama produk wajib diisi!');return;}
+  if(!id){toast('⚠ ID produk wajib diisi!');return;}
+  if(hj<=0){toast('⚠ Harga jual harus lebih dari 0!');return;}
+
+  const cfg=loadBBMConfig();
+  if(cfg.find(p=>p.id===id)){toast('⚠ ID produk sudah ada!');return;}
+
+  cfg.push({id,label,tag,batas,hj,mg,aktif:true});
+  saveBBMConfig(cfg);
+
+  // Tambah ke state.harga
+  state.harga[id]=hj;
+  state.harga['hpp_'+id]=hj-mg;
+  saveHargaLocal();
+  dbSave();
+
+  toast('✓ Produk "'+label+'" berhasil ditambahkan!');
+  pgProdukEdit=null;
+  renderPengaturanPage(e('main-content'));
+}
+
+function pgSimpanProduk(id){
+  const cfg=loadBBMConfig();
+  const idx=cfg.findIndex(p=>p.id===id);
+  if(idx<0){toast('⚠ Produk tidak ditemukan!');return;}
+
+  const label=(e('pg-bbm-label')?.value||'').trim();
+  const tag=e('pg-bbm-tag')?.value||cfg[idx].tag;
+  const hj=parseInt((e('pg-bbm-hj')?.value||'0').replace(/\./g,''))||0;
+  const mg=parseInt((e('pg-bbm-mg')?.value||'0').replace(/\./g,''))||0;
+  const batas=parseInt((e('pg-bbm-batas')?.value||'1000').replace(/\./g,''))||1000;
+
+  if(!label){toast('⚠ Nama produk wajib diisi!');return;}
+  if(hj<=0){toast('⚠ Harga jual harus lebih dari 0!');return;}
+
+  cfg[idx]={...cfg[idx],label,tag,batas,hj,mg};
+  saveBBMConfig(cfg);
+
+  // Update harga
+  state.harga[id]=hj;
+  state.harga['hpp_'+id]=hj-mg;
+  saveHargaLocal();
+  dbSave();
+
+  toast('✓ Produk "'+label+'" berhasil diperbarui!');
+  pgProdukEdit=null;
+  renderPengaturanPage(e('main-content'));
+}
+
+function pgToggleProduk(id){
+  const cfg=loadBBMConfig();
+  const p=cfg.find(x=>x.id===id);
+  if(!p)return;
+  p.aktif=!(p.aktif!==false);
+  saveBBMConfig(cfg);
+  toast((p.aktif?'✓ Aktifkan':'⊘ Nonaktifkan')+' produk '+p.label);
+  renderPengaturanPage(e('main-content'));
+}
+
+function pgHapusProduk(id){
+  const isDefault=['pertalite','pertamax','dexlite','biosolar'].includes(id);
+  if(isDefault){toast('⚠ Produk bawaan tidak bisa dihapus. Nonaktifkan saja.');return;}
+  const cfg=loadBBMConfig();
+  const p=cfg.find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm('Hapus produk "'+p.label+'"?\nData historis yang sudah tersimpan tidak akan terhapus.'))return;
+  saveBBMConfig(cfg.filter(x=>x.id!==id));
+  toast('✓ Produk dihapus.');
+  renderPengaturanPage(e('main-content'));
+}
+
+function pgNaikProduk(idx){
+  const cfg=loadBBMConfig();
+  if(idx<=0)return;
+  [cfg[idx-1],cfg[idx]]=[cfg[idx],cfg[idx-1]];
+  saveBBMConfig(cfg);
+  renderPengaturanPage(e('main-content'));
+}
+
+function pgTurunProduk(idx){
+  const cfg=loadBBMConfig();
+  if(idx>=cfg.length-1)return;
+  [cfg[idx],cfg[idx+1]]=[cfg[idx+1],cfg[idx]];
+  saveBBMConfig(cfg);
+  renderPengaturanPage(e('main-content'));
+}
+
+
+// ═══════════════════════════════════════════════════════════════
 //  PENGATURAN
 // ═══════════════════════════════════════════════════════════════
 let pgTab = 'profil'; // 'profil' | 'users' | 'keamanan'
@@ -4621,9 +4888,10 @@ function renderPengaturanPage(main){
 
   // ── Render halaman ──────────────────────────────────────
   const tabs=[
-    {id:'profil', icon:'🏢', label:'Profil SPBU'},
-    {id:'users',  icon:'👥', label:'Kelola Pengguna'},
-    {id:'keamanan',icon:'🔐',label:'Keamanan'},
+    {id:'profil',  icon:'🏢', label:'Profil SPBU'},
+    {id:'produk',  icon:'⛽', label:'Produk BBM'},
+    {id:'users',   icon:'👥', label:'Kelola Pengguna'},
+    {id:'keamanan',icon:'🔐', label:'Keamanan'},
   ];
 
   main.innerHTML=`
@@ -4644,7 +4912,7 @@ function renderPengaturanPage(main){
   </div>
 
   <!-- KONTEN TAB -->
-  ${pgTab==='profil'?tabProfil:pgTab==='users'?tabUsers:tabKeamanan}
+  ${pgTab==='profil'?tabProfil:pgTab==='produk'?renderTabProduk():pgTab==='users'?tabUsers:tabKeamanan}
   `;
 }
 
@@ -5984,10 +6252,14 @@ function fbStartListener(){
   appRef.on('value', snap=>{
     if(!snap.exists()) return;
     const d = snap.val();
+    if(d.bbmConfig&&Array.isArray(d.bbmConfig)){
+      saveBBMConfig(d.bbmConfig);
+      // Refresh halaman yang terpengaruh
+      if(['harga','input','pengaturan'].includes(currentPage)) showPage(currentPage);
+    }
     if(d.harga){
       state.harga = {...state.harga,...d.harga};
-      saveHargaLocal(); // Simpan lokal agar tersedia offline
-      // Refresh halaman harga jika sedang dibuka
+      saveHargaLocal();
       if(currentPage==='harga') showPage('harga');
     }
     if(d.bebanUsaha) state.bebanUsaha = d.bebanUsaha;
@@ -6007,6 +6279,7 @@ async function fbSaveAppState(){
       harga: state.harga,
       riwayatHarga: state.riwayatHarga||[],
       profil: getProfil(),
+      bbmConfig: loadBBMConfig(),
       updatedAt: new Date().toISOString()
     });
     return true;
@@ -6022,9 +6295,12 @@ async function fbLoadAppState(){
       const d = snap.val();
       if(d.bebanUsaha) state.bebanUsaha = d.bebanUsaha;
       if(d.bebanId)    state.bebanId    = d.bebanId;
+      if(d.bbmConfig&&Array.isArray(d.bbmConfig)){
+        saveBBMConfig(d.bbmConfig); // Rebuild BBM globals
+      }
       if(d.harga){
         state.harga = {...state.harga,...d.harga};
-        saveHargaLocal(); // Simpan ke localStorage agar tersedia offline
+        saveHargaLocal();
       }
       if(d.riwayatHarga) state.riwayatHarga = d.riwayatHarga;
       if(d.profil)     saveProfil(d.profil);
