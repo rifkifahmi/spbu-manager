@@ -1937,8 +1937,15 @@ function saveData(){
   state.draft={};state.shiftSaved={pagi:false,siang:false,malam:false};state.midShift={pagi:false,siang:false,malam:false};
   dbSave();
   toast('✓ Data '+tanggal+' tersimpan!');
-  // Sync ke Firebase (background, tidak blok UI)
+  // ── Sync ke Firebase (real-time, primary) ──────────────
   if(_fbInited) fbSaveDay(rec).catch(()=>{});
+  // ── Sync ke Apps Script/Google Sheets (backup) ──────────
+  const _asUrl=localStorage.getItem(CLOUD_KEY)||'';
+  if(_asUrl&&_asUrl!=='firebase'&&_asUrl.startsWith('https://')){
+    fetch(_asUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'save',data:rec})
+    }).catch(()=>{}); // silent — tidak blok UI
+  }
   previewOpen=false;
   showPage('stok');
   // Auto cloud sync jika URL sudah diatur
@@ -5991,48 +5998,66 @@ function renderDBPage(main){
     ${cloudStatusHtml}
   </div>
 
-  <!-- FIREBASE PANEL -->
+  <!-- KONEKSI PANEL -->
   <div class="card" style="margin-bottom:12px;border:2px solid var(--blue-light)">
-    <div class="card-title" style="color:var(--blue)">☁ Firebase Multi-Device Sync</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-      <div style="background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius);padding:14px;text-align:center">
-        <div style="font-size:22px;margin-bottom:6px">📱</div>
-        <div style="font-size:12px;font-weight:700;color:var(--green)">Multi-Device</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:4px">HP + Komputer bisa buka bersamaan</div>
+    <div class="card-title" style="color:var(--blue)">🔗 Koneksi Database</div>
+
+    <!-- Status row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius);padding:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">☁ Firebase Realtime DB</div>
+        <div class="db-badge" style="font-size:12px;font-weight:600">
+          <span class="db-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F5C518;margin-right:6px"></span>
+          Menghubungkan...
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Real-time · Multi-device · Otomatis</div>
       </div>
-      <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);padding:14px;text-align:center">
-        <div style="font-size:22px;margin-bottom:6px">⚡</div>
-        <div style="font-size:12px;font-weight:700;color:var(--blue)">Real-Time</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:4px">Data muncul otomatis tanpa refresh</div>
-      </div>
-      <div style="background:var(--amber-bg);border:1px solid var(--amber-light);border-radius:var(--radius);padding:14px;text-align:center">
-        <div style="font-size:22px;margin-bottom:6px">🔒</div>
-        <div style="font-size:12px;font-weight:700;color:var(--amber)">Auto Backup</div>
-        <div style="font-size:11px;color:var(--text2);margin-top:4px">Data aman di server Google</div>
+      <div id="as-status-box" style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">📊 Google Sheets (Apps Script)</div>
+        <div style="font-size:12px;font-weight:600;color:${localStorage.getItem(CLOUD_KEY)&&localStorage.getItem(CLOUD_KEY)!=='firebase'?'var(--green)':'var(--amber)'}">
+          ${localStorage.getItem(CLOUD_KEY)&&localStorage.getItem(CLOUD_KEY)!=='firebase'?'● Terhubung':'○ Belum diatur'}
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Backup ke Sheets · Laporan Excel</div>
       </div>
     </div>
 
-    <div style="background:var(--surface2);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px">
-      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div>
-          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px">Status Koneksi</div>
-          <div class="db-badge" style="font-size:13px;font-weight:600">
-            <span class="db-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F5C518;margin-right:6px"></span>
-            Menghubungkan...
-          </div>
-        </div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-primary btn-sm" onclick="testCloud()">🔌 Test Koneksi</button>
-          <button class="btn btn-ghost btn-sm" onclick="fbSyncAll()">↻ Sync Semua ke Firebase</button>
-          <button class="btn btn-ghost btn-sm" onclick="fbLoadAll().then(()=>fbLoadAppState())">⬇ Ambil dari Firebase</button>
-        </div>
+    <!-- Tombol aksi -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <button class="btn btn-primary btn-sm" onclick="testCloud()">🔌 Test Semua Koneksi</button>
+      <button class="btn btn-ghost btn-sm" onclick="syncKeduanya()">↻ Sync ke Semua</button>
+      <button class="btn btn-ghost btn-sm" onclick="fbLoadAll().then(()=>fbLoadAppState())">⬇ Ambil dari Firebase</button>
+    </div>
+
+    <!-- Input URL Apps Script -->
+    <div style="background:var(--surface2);border-radius:var(--radius);padding:12px 14px;margin-bottom:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:8px">
+        📊 URL Apps Script (Google Sheets)
+        <span style="font-size:10px;font-weight:400;color:var(--text3);margin-left:6px">— opsional, untuk backup ke Sheets</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input type="text" class="inp" id="cloud-url-input"
+          value="${localStorage.getItem(CLOUD_KEY)&&localStorage.getItem(CLOUD_KEY)!=='firebase'?localStorage.getItem(CLOUD_KEY):''}"
+          placeholder="https://script.google.com/macros/s/xxxxx/exec"
+          style="font-size:11px;font-family:monospace;flex:1">
+        <button class="btn btn-save btn-sm" onclick="simpanUrlCloud()">💾 Simpan</button>
+        ${localStorage.getItem(CLOUD_KEY)&&localStorage.getItem(CLOUD_KEY)!=='firebase'
+          ?'<button class="btn btn-ghost btn-sm" onclick="migrasiSheetsKeFirebase()">📥 Migrasi Sheets→Firebase</button>':''}
+      </div>
+      <div style="font-size:11px;color:var(--text2)">
+        Setelah diisi: data otomatis tersimpan ke <strong>Firebase</strong> (real-time) DAN <strong>Google Sheets</strong> (backup) setiap kali simpan.
       </div>
     </div>
 
-    <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius);font-size:11px;color:var(--text2)">
-      💡 <strong>Cara berbagi ke device lain:</strong> Kirim file <code>spbu_manager.html</code> ini ke HP/komputer lain. 
-      Buka di browser → data otomatis terhubung ke Firebase yang sama. 
-      Tidak perlu install apapun.
+    <!-- Log koneksi -->
+    <div id="cloud-status-card" style="display:${localStorage.getItem(CLOUD_KEY)?'block':'none'}">
+      <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">Log Koneksi:</div>
+      <div id="cloud-log" style="font-size:12px;color:var(--text2);line-height:2;background:var(--surface2);padding:10px 12px;border-radius:var(--radius)">
+        Tekan "Test Semua Koneksi" untuk memeriksa status.
+      </div>
+    </div>
+
+    <div style="margin-top:10px;padding:8px 12px;background:var(--blue-bg);border-radius:var(--radius);font-size:11px;color:var(--blue)">
+      💡 <strong>Multi-device:</strong> Kirim file <code>spbu_manager.html</code> ke HP/komputer lain → buka di browser → otomatis terhubung ke data yang sama.
     </div>
   </div>
 
@@ -6260,33 +6285,48 @@ function hapusUrlCloud(){
 }
 
 async function testCloud(){
-  const url=getCloudUrl();
-  if(!url){toast('⚠ URL belum diatur!');return;}
   const log=e('cloud-log');
   const card=e('cloud-status-card');
   if(card)card.style.display='block';
-  if(log)log.innerHTML='<span style="color:var(--amber)">↻ Menguji koneksi...</span>';
-  setCloudStatus('syncing');
+  let html='';
+
+  // ── Test Firebase ────────────────────────────────────────
+  html+='<div style="font-weight:700;color:var(--text2);margin-bottom:6px">☁ Firebase Realtime DB</div>';
   try{
-    const res=await fetch(url+'?action=load');
-    if(!res.ok)throw new Error('HTTP '+res.status);
-    const json=await res.json();
-    if(json.status==='ok'){
-      setCloudStatus('active','● Cloud Aktif');
-      if(log)log.innerHTML=`<span style="color:var(--green)">✓ Koneksi berhasil!</span><br>
-        📊 Data di cloud: <strong>${json.data.length} rekaman</strong><br>
-        🕐 Diuji: ${new Date().toLocaleString('id-ID')}<br>
-        ${json.data.length?'📅 Data terbaru: <strong>'+json.data[0].tanggal+'</strong>':''}`;
-      toast('✓ Koneksi cloud berhasil! '+json.data.length+' rekaman ditemukan.');
-    }else{
-      throw new Error(json.msg||'Respons tidak valid');
-    }
+    const ok=await fbInit();
+    if(ok){
+      await fbPath(FB_ROOT+'/ping').set({t:Date.now()});
+      html+='<span style="color:var(--green)">✓ Firebase terhubung!</span> Data real-time aktif di semua device.<br>';
+      setCloudStatus('active','● Firebase Aktif');
+    }else throw new Error('Inisialisasi gagal');
   }catch(err){
-    setCloudStatus('error','✕ Gagal');
-    if(log)log.innerHTML=`<span style="color:var(--red)">✕ Koneksi gagal: ${err.message}</span><br>
-      <span style="font-size:11px;color:var(--text2)">Pastikan URL benar dan Apps Script sudah di-deploy dengan akses "Anyone".</span>`;
-    toast('✕ Koneksi gagal: '+err.message);
+    html+='<span style="color:var(--red)">✕ Firebase gagal: '+err.message+'</span><br>';
   }
+
+  // ── Test Apps Script (Google Sheets) ────────────────────
+  html+='<div style="font-weight:700;color:var(--text2);margin:10px 0 6px">📊 Google Sheets (Apps Script)</div>';
+  const url=localStorage.getItem(CLOUD_KEY)||'';
+  if(!url||url==='firebase'){
+    html+='<span style="color:var(--amber)">○ Belum diatur.</span> Isi URL Apps Script di bawah untuk aktifkan backup ke Google Sheets.<br>';
+  }else{
+    try{
+      const res=await fetch(url+'?action=load');
+      if(!res.ok)throw new Error('HTTP '+res.status);
+      const json=await res.json();
+      if(json.status==='ok'){
+        html+='<span style="color:var(--green)">✓ Apps Script terhubung!</span> '
+          +json.data.length+' rekaman di Sheets.'
+          +(json.data.length?'<br>📅 Data terbaru: <strong>'+json.data[0].tanggal+'</strong>':'')+'<br>';
+      }else throw new Error(json.msg);
+    }catch(err){
+      html+='<span style="color:var(--red)">✕ Apps Script gagal: '+err.message+'</span><br>'
+        +'<span style="font-size:11px;color:var(--text2)">Cek URL dan pastikan deploy dengan akses "Anyone".</span><br>';
+    }
+  }
+
+  html+='<span style="font-size:11px;color:var(--text3)">🕐 Diuji: '+new Date().toLocaleString('id-ID')+'</span>';
+  if(log)log.innerHTML=html;
+  toast('✓ Tes koneksi selesai');
 }
 
 async function muatDariCloud(){
@@ -6300,6 +6340,70 @@ async function muatDariCloud(){
   }else{
     toast('✕ Gagal muat: '+r.msg);
   }
+}
+
+// ── Migrasi: tarik data dari Google Sheets → Firebase ───────
+async function migrasiSheetsKeFirebase(){
+  const url=localStorage.getItem(CLOUD_KEY)||'';
+  if(!url||url==='firebase'){
+    toast('⚠ URL Apps Script belum diatur!');return;
+  }
+  if(!confirm('Tarik semua data dari Google Sheets ke Firebase?\nProses ini akan menggabungkan data — tidak ada yang dihapus.'))return;
+
+  toast('↻ Mengambil data dari Sheets...');
+  try{
+    // 1. Ambil dari Sheets
+    const res=await fetch(url+'?action=load');
+    const json=await res.json();
+    if(json.status!=='ok')throw new Error(json.msg||'Gagal');
+    const sheetsData=json.data||[];
+    if(!sheetsData.length){toast('⚠ Tidak ada data di Sheets.');return;}
+
+    // 2. Merge dengan data lokal
+    const merged={};
+    state.savedData.forEach(d=>merged[d.tanggal]=d);
+    sheetsData.forEach(d=>merged[d.tanggal]=d);
+    state.savedData=Object.values(merged).sort((a,b)=>a.tanggal>b.tanggal?-1:1);
+    dbSave();
+
+    // 3. Push semua ke Firebase
+    if(!await fbInit())throw new Error('Firebase tidak terhubung');
+    let ok=0;
+    for(const rec of state.savedData){
+      await fbSaveDay(rec);ok++;
+      if(ok%5===0)setCloudStatus('syncing','↻ '+ok+'/'+state.savedData.length+'...');
+    }
+    setCloudStatus('active','● '+ok+' hari tersinkron');
+    toast('✓ Migrasi selesai! '+ok+' hari data dari Sheets → Firebase');
+    renderDBPage(e('main-content'));
+  }catch(err){
+    toast('✕ Gagal migrasi: '+err.message);
+    setCloudStatus('error','✕ '+err.message);
+  }
+}
+
+// ── Sinkronisasi dua arah: Firebase ↔ Sheets ────────────────
+async function syncKeduanya(){
+  const url=localStorage.getItem(CLOUD_KEY)||'';
+  if(!url||url==='firebase'){
+    // Hanya sync ke Firebase
+    await fbSyncAll();return;
+  }
+  // Sync ke Firebase + Sheets bersamaan
+  setCloudStatus('syncing','↻ Sync ke semua...');
+  let fbOk=0,asOk=0,fail=0;
+  for(const rec of state.savedData){
+    const r1=fbSaveDay(rec);
+    const r2=fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({action:'save',data:rec})}).then(r=>r.json());
+    const [fb,as]=await Promise.allSettled([r1,r2]);
+    if(fb.status==='fulfilled'&&fb.value)fbOk++;
+    if(as.status==='fulfilled'&&as.value?.status==='ok')asOk++;else fail++;
+  }
+  await fbSaveAppState();
+  setCloudStatus('active','● Firebase '+fbOk+' | Sheets '+asOk);
+  toast('✓ Firebase: '+fbOk+' hari | Sheets: '+asOk+' hari');
+  renderDBPage(e('main-content'));
 }
 
 function exportData(){
