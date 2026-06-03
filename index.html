@@ -1080,16 +1080,17 @@ function renderShifts(){
       // Hitung stok awal otomatis dari stok akhir efektif shift sebelumnya (dalam hari)
       let prevShiftVal=0;
       if(!isPagi&&prev){
-        const pAwal=parseInt((e(`${prev}-awal-${b}`)?.value||'0').replace(/\./g,''))||0;
-        const pJual=parseInt((e(`${prev}-jual-${b}`)?.value||'0').replace(/\./g,''))||0;
-        const pTambah=parseInt((e(`${prev}-tambah-${b}`)?.value||'0').replace(/\./g,''))||0;
+        const pAwal=parseInt((e(`${prev}-awal-${b}`)?.value||'0').replace(/[^0-9]/g,''))||0;
+        const pJulEl=e(`${prev}-jual-${b}`);
         const pHabis=e(`${prev}-habis-${b}`)?.checked||false;
-        const pTambahTarget=getTambahTarget(prev);
-        const pTambahCur=pTambahTarget==='current'?pTambah:0;
-        const pTambahNext=pTambahTarget==='next'?pTambah:0;
+        const pJual=pHabis&&pJulEl?.dataset?.jualAsli?parseInt((pJulEl.dataset.jualAsli||'0').replace(/[^0-9]/g,''))||0:parseInt((pJulEl?.value||'0').replace(/[^0-9]/g,''))||0;
+        // Mid-shift: stok masuk ke shift prev
+        const pTambahMid=state.midShift&&state.midShift[prev]?parseInt((e(`${prev}-tambah-${b}`)?.value||'0').replace(/[^0-9]/g,''))||0:0;
+        // Tambah Normal: stok dari shift prev masuk ke shift ini (sh)
+        const pTambahNormal=state.tambahNormal&&state.tambahNormal[prev]?parseInt((e(`${prev}-tambah-normal-${b}`)?.value||'0').replace(/[^0-9]/g,''))||0:0;
         const pJual2=getJual2(prev,b);
-        const pR=calcRow(pAwal,pJual,pTambahCur,pHabis,pJual2);
-        prevShiftVal=Math.max(0,pR.stokAkhirEfektif+pTambahNext);
+        const pR=calcRow(pAwal,pJual,pTambahMid,pHabis,pJual2);
+        prevShiftVal=Math.max(0,pR.stokAkhirEfektif+pTambahNormal);
       }
       const awalVal=isAwalAuto?prevDayVal:(!isPagi&&prev?prevShiftVal:(d.awal||0));
       const isAuto=(!isPagi&&prev)||isAwalAuto;
@@ -1099,7 +1100,7 @@ function renderShifts(){
       return`<tr id="tr-${sh}-${b}">
         <td><span class="tag ${BT[b]}">${BL[b]}</span></td>
         <td>
-          <input type="text" id="${sh}-awal-${b}" value="${awalVal}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px">
+          <input type="text" id="${sh}-awal-${b}" value="${fN(awalVal)}" class="${awalStyle}" ${isAuto||lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px">
           ${isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:var(--blue);margin-top:2px;white-space:nowrap">↑ dari ${getPrevDayTanggal(tgl)||'data sebelumnya'}: ${fN(prevDayVal)} ltr</div>`:''}
           ${isAuto&&!isAwalAuto?`<div id="${sh}-awal-info-${b}" style="font-size:10px;color:${prevShiftVal>0?'var(--blue)':'var(--red)'};margin-top:2px;white-space:nowrap">↑ stok akhir ${prev?cap(prev):''}: ${fN(prevShiftVal)} ltr</div>`:''}
           ${isPagi&&!isAwalAuto&&!isAuto?`<div style="font-size:10px;color:var(--amber);margin-top:2px;white-space:nowrap">✏ Stok pembuka — input manual</div>`:''}
@@ -1246,7 +1247,10 @@ function renderShifts(){
     ${idx<active.length-1?`<div class="flow-arrow">↓ Stok akhir efektif ${cap(sh)} → Stok awal ${cap(active[idx+1])}</div>`:''}`;
   }).join('');
   if(e('form-biaya'))e('form-biaya').style.display=active.length>0?'block':'none';
-  setTimeout(()=>calcAll(),20);
+  // Panggil calcAll langsung (DOM sudah siap karena innerHTML sudah diset di atas)
+  // Gunakan timeout kecil hanya sebagai fallback jika ada rendering delay
+  calcAll();
+  setTimeout(()=>calcAll(),50);
 }
 
 function saveShift(sh){state.shiftSaved[sh]=true;dbSave();toast('Shift '+cap(sh)+' tersimpan dan dikunci ✓');renderShifts();calcAll();}
@@ -1299,7 +1303,18 @@ function calcShift(sh){
       jEl.readOnly=true;jEl.className='inp inp-num';jEl.style.background='var(--red-bg)';jEl.style.color='var(--red)';
     }else{jEl.dataset.jualAsli='';jEl.readOnly=false;jEl.style.background='';jEl.style.color='';}}
     const cc=e(`${sh}-catatan-cell-${b}`);
-    if(cc){if(r.isLocked){const cls=r.lockType==='losses'?'pill pill-zero-l':'pill pill-zero-p';cc.innerHTML=`<span class="${cls}">0 🔒</span>`;}else if(r.catatan<=BATAS[b]&&r.catatan>0){cc.innerHTML=`<span class="pill pill-rendah">${fN(r.catatan)}</span>`;}else{cc.innerHTML=`<span class="pill pill-ok">${fN(r.catatan)}</span>`;}}
+    if(cc){
+      if(r.isLocked){
+        const cls=r.lockType==='losses'?'pill pill-zero-l':'pill pill-zero-p';
+        cc.innerHTML=`<span class="${cls}">0 🔒</span>`;
+      }else if(r.catatan===0){
+        cc.innerHTML=`<span class="pill pill-zero-l">0</span>`;
+      }else if(r.catatan<=BATAS[b]){
+        cc.innerHTML=`<span class="pill pill-rendah">${fN(r.catatan)}</span>`;
+      }else{
+        cc.innerHTML=`<span class="pill pill-ok">${fN(r.catatan)}</span>`;
+      }
+    }
     const sc2=e(`${sh}-sel-cell-${b}`);
     if(sc2){if(r.isLocked&&r.lockType==='losses'){sc2.innerHTML=`<span class="losses-val">▲ Losses ${fN(r.losses)} ltr 🔒<br><small style="font-weight:400">Stok ${fN(awal)} − Jual ${fN(jual)} = <strong>${fN(r.losses)}</strong></small></span>`;}else if(r.isLocked&&r.lockType==='plus'){sc2.innerHTML=`<span class="plus-val">↑ Plus +${fN(r.plus)} ltr 🔒<br><small style="font-weight:400">Jual ${fN(jual)} − Stok ${fN(awal)} = <strong>${fN(r.plus)}</strong></small></span>`;}else{sc2.innerHTML='<span style="color:var(--text3);font-size:12px">— Normal</span>';}}
     const ns=e(`${sh}-stk-cur-${b}`);
