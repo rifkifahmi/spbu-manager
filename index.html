@@ -1223,22 +1223,22 @@ function renderShifts(){
               </div>
             </div>
           </div>
-          ${nextShift
-            ?"<div style=\"padding:12px 14px;background:var(--amber-bg);border:1px solid var(--amber-light);border-radius:var(--radius)\">"
-            +"<label style=\"display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none"+(saved?";opacity:.5;pointer-events:none":"")+"\">"  
-            +"<input type=\"checkbox\" id=\"${sh}-normal-chk\""
-            +" "+((state.tambahNormal&&state.tambahNormal[sh])?"checked":"")
-            +" "+(saved?"disabled":"")
-            +" onchange=\"toggleTambahNormal('${sh}')\" style=\"width:16px;height:16px;accent-color:var(--amber)\">"
-            +"<div style=\"flex:1\">"
-            +"<div style=\"font-size:13px;font-weight:700;color:var(--amber)\">📦 Penambahan Stok Normal</div>"
-            +"<div style=\"font-size:11px;color:var(--text2);margin-top:2px\">Stok disiapkan untuk shift berikutnya — masuk ke <strong>Stok Awal Shift "+cap(nextShift)+"</strong></div>"
-            +"</div></label>"
-            +"<div id=\"${sh}-normal-sec\" style=\"display:"+(( state.tambahNormal&&state.tambahNormal[sh])?"block":"none")+";margin-top:12px;padding-top:12px;border-top:1px solid var(--amber-light)\">"
-            +"<div style=\"font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px\">Volume untuk Shift "+cap(nextShift)+" (ltr)</div>"
-            +"<div class=\"form-row cols-4\">${tambahNormalGrid}</div>"
-            +"</div></div>"
-            :""}
+          ${nextShift?`
+          <div style="margin-top:8px;padding:12px 14px;background:var(--amber-bg);border:1px solid var(--amber-light);border-radius:var(--radius)">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none${saved?';opacity:.5;pointer-events:none':''}">
+              <input type="checkbox" id="${sh}-normal-chk"
+                ${(state.tambahNormal&&state.tambahNormal[sh])?"checked":""} ${saved?"disabled":""}
+                onchange="toggleTambahNormal('${sh}')" style="width:16px;height:16px;accent-color:var(--amber)">
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:700;color:var(--amber)">📦 Penambahan Stok Normal</div>
+                <div style="font-size:11px;color:var(--text2);margin-top:2px">Stok disiapkan untuk shift berikutnya — masuk ke <strong>Stok Awal Shift ${cap(nextShift)}</strong></div>
+              </div>
+            </label>
+            <div id="${sh}-normal-sec" style="display:${(state.tambahNormal&&state.tambahNormal[sh])?"block":"none"};margin-top:12px;padding-top:12px;border-top:1px solid var(--amber-light)">
+              <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Volume untuk Shift ${cap(nextShift)} (ltr)</div>
+              <div class="form-row cols-4">${tambahNormalGrid}</div>
+            </div>
+          </div>`:''}
         </div>
         <div id="notice-${sh}" style="margin-top:12px"></div>
       </div>
@@ -1289,7 +1289,7 @@ function calcShift(sh){
     // Baca nilai jual: jika habis, gunakan nilai asli dari dataset (bukan 0)
     const jual=habis&&jEl?.dataset?.jualAsli?parseInt((jEl.dataset.jualAsli||'0').replace(/\./g,''))||0:gv(`${sh}-jual-${b}`);
     // Mid-shift: masuk ke shift berjalan; Normal: ke shift berikutnya (tidak masuk calcRow ini)
-    const tambahMid=state.midShift&&state.midShift[sh]?gv(`${sh}-tambah-${b}`):0;
+    const tambahMid=state.midShift&&state.midShift[sh]?gv(`${sh}-tambahMid-${b}`):0;
     const jual2=getJual2(sh,b);
     const r=calcRow(awal,jual,tambahMid,habis,jual2);
     if(jEl&&!state.shiftSaved[sh]){if(habis){
@@ -1303,20 +1303,20 @@ function calcShift(sh){
     const sc2=e(`${sh}-sel-cell-${b}`);
     if(sc2){if(r.isLocked&&r.lockType==='losses'){sc2.innerHTML=`<span class="losses-val">▲ Losses ${fN(r.losses)} ltr 🔒<br><small style="font-weight:400">Stok ${fN(awal)} − Jual ${fN(jual)} = <strong>${fN(r.losses)}</strong></small></span>`;}else if(r.isLocked&&r.lockType==='plus'){sc2.innerHTML=`<span class="plus-val">↑ Plus +${fN(r.plus)} ltr 🔒<br><small style="font-weight:400">Jual ${fN(jual)} − Stok ${fN(awal)} = <strong>${fN(r.plus)}</strong></small></span>`;}else{sc2.innerHTML='<span style="color:var(--text3);font-size:12px">— Normal</span>';}}
     const ns=e(`${sh}-stk-cur-${b}`);
-    if(ns){if(tambah>0){ns.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;}else{ns.textContent='';}}
+    if(ns){if(tambahMid>0){ns.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;}else{ns.textContent='';}}
     const tr=e(`tr-${sh}-${b}`);
     if(tr)tr.className=r.isLocked&&r.lockType==='losses'?'row-losses':r.isLocked&&r.lockType==='plus'?'row-plus':state.shiftSaved[sh]?'row-saved':'';
     const st2=e(`${sh}-status-${b}`);
-    if(st2){if(r.isLocked&&r.lockType==='losses'){let s=`<span class="bx bl">Losses 🔒</span>`;if(tambah>0)s+=` <span class="bx bn">+${fN(tambah)} baru</span>`;st2.innerHTML=s;}else if(r.isLocked&&r.lockType==='plus'){let s=`<span class="bx bp">Plus 🔒</span>`;if(tambah>0)s+=` <span class="bx bn">+${fN(tambah)} baru</span>`;st2.innerHTML=s;}else if(r.catatan<=BATAS[b]&&r.catatan>0){st2.innerHTML='<span class="bx bw">Rendah</span>';}else{st2.innerHTML='<span class="bx bk">OK</span>';}}
+    if(st2){if(r.isLocked&&r.lockType==='losses'){let s=`<span class="bx bl">Losses 🔒</span>`;if(tambahMid>0)s+=` <span class="bx bn">+${fN(tambahMid)} baru</span>`;st2.innerHTML=s;}else if(r.isLocked&&r.lockType==='plus'){let s=`<span class="bx bp">Plus 🔒</span>`;if(tambahMid>0)s+=` <span class="bx bn">+${fN(tambahMid)} baru</span>`;st2.innerHTML=s;}else if(r.catatan<=BATAS[b]&&r.catatan>0){st2.innerHTML='<span class="bx bw">Rendah</span>';}else{st2.innerHTML='<span class="bx bk">OK</span>';}}
     if(r.isLocked&&r.lockType==='losses'){
       let msg=`▲ <strong>${BL[b]}</strong>: Tangki habis — Losses = Stok ${fN(awal)} − Jual ${fN(jual)} = <strong>${fN(r.losses)} ltr 🔒</strong> — kerugian ${fRF(r.losses*gHJ(b))}.`;
-      if(tambah>0&&jual2>0)msg+=` Tambah ${fN(tambah)} ltr → Jual lanjutan ${fN(jual2)} ltr → Stok akhir ${fN(r.stokAkhirEfektif)} ltr.`;
-      else if(tambah>0)msg+=` Tambah ${fN(tambah)} ltr masuk sebagai stok baru → Stok akhir ${fN(r.stokAkhirEfektif)} ltr.`;
+      if(tambahMid>0&&jual2>0)msg+=` Tambah ${fN(tambahMid)} ltr → Jual lanjutan ${fN(jual2)} ltr → Stok akhir ${fN(r.stokAkhirEfektif)} ltr.`;
+      else if(tambahMid>0)msg+=` Tambah ${fN(tambahMid)} ltr masuk sebagai stok baru → Stok akhir ${fN(r.stokAkhirEfektif)} ltr.`;
       notices.push(`<div class="nt nt-d">${msg}</div>`);
     }
-    if(r.isLocked&&r.lockType==='plus'){let msg=`↑ <strong>${BL[b]}</strong>: Plus = ${fN(jual)}−${fN(awal)} = <strong>${fN(r.plus)} ltr</strong> 🔒 — keuntungan +${fRF(r.plus*gHJ(b))}.`;if(tambah>0)msg+=` Penambahan ${fN(tambah)} ltr = stok baru.`;notices.push(`<div class="nt nt-p">${msg}</div>`);}
+    if(r.isLocked&&r.lockType==='plus'){let msg=`↑ <strong>${BL[b]}</strong>: Plus = ${fN(jual)}−${fN(awal)} = <strong>${fN(r.plus)} ltr</strong> 🔒 — keuntungan +${fRF(r.plus*gHJ(b))}.`;if(tambahMid>0)msg+=` Penambahan ${fN(tambahMid)} ltr = stok baru.`;notices.push(`<div class="nt nt-p">${msg}</div>`);}
     if(!r.isLocked&&r.catatan>0&&r.catatan<=BATAS[b])notices.push(`<div class="nt nt-w">⚠ <strong>${BL[b]}</strong>: Stok menipis sisa ${fN(r.catatan)} ltr.</div>`);
-    if(tambah>0&&!r.isLocked)notices.push(`<div class="nt nt-s">+ <strong>${BL[b]}</strong>: Penambahan ${fN(tambah)} ltr berjalan — stok akhir ${fN(r.stokAkhirEfektif)} ltr.</div>`);
+    if(tambahMid>0&&!r.isLocked)notices.push(`<div class="nt nt-s">+ <strong>${BL[b]}</strong>: Penambahan ${fN(tambahMid)} ltr berjalan — stok akhir ${fN(r.stokAkhirEfektif)} ltr.</div>`);
   });
   const nb=e(`notice-${sh}`);if(nb)nb.innerHTML=notices.join('');
 }
