@@ -615,6 +615,9 @@ tr.row-saved{opacity:.8}
     <a class="nav-item" id="nav-laporan" onclick="showPage('laporan')" href="#">
       <span class="nav-icon">📰</span> Laporan Harian
     </a>
+    <a class="nav-item" id="nav-penerimaan" onclick="showPage('penerimaan')" href="#">
+      <span class="nav-icon">🚚</span> Penerimaan BBM
+    </a>
     <a class="nav-item" id="nav-stoklaporan" onclick="showPage('stoklaporan')" href="#">
       <span class="nav-icon">🛢</span> Laporan Stok BBM
     </a>
@@ -739,6 +742,7 @@ const ALL_MENUS=[
   {id:'selisih',label:'Losses & Plus',icon:'⚖'},
   {id:'histori',label:'Histori',icon:'📋'},
   {id:'laporan',label:'Laporan Harian',icon:'📰'},
+  {id:'penerimaan',label:'Penerimaan BBM',icon:'🚚'},
   {id:'stoklaporan',label:'Laporan Stok BBM',icon:'🛢'},
   {id:'beban',label:'Beban Usaha',icon:'📝'},
   {id:'labarugi',label:'Laporan Laba Rugi',icon:'📋'},
@@ -749,7 +753,7 @@ const ALL_MENUS=[
   {id:'database',label:'Database',icon:'💾'},
 ];
 const OWNER_DEFAULT_MENUS=ALL_MENUS.map(m=>m.id);
-const MANAGER_DEFAULT_MENUS=['input','stok','laba','selisih','histori','laporan','stoklaporan','beban','labarugi'];
+const MANAGER_DEFAULT_MENUS=['input','stok','laba','selisih','histori','laporan','penerimaan','stoklaporan','beban','labarugi'];
 
 function getUsers(){
   try{
@@ -914,7 +918,7 @@ function buildSidebar(){
 
   // Data — semua menu data termasuk laporan
   html+='<div class="nav-divider"></div><div class="nav-section">Data</div>';
-  ['histori','laporan','stoklaporan','beban','labarugi','rekap','lapkeu','harga','pengaturan'].forEach(m=>{
+  ['histori','laporan','penerimaan','stoklaporan','beban','labarugi','rekap','lapkeu','harga','pengaturan'].forEach(m=>{
     const def=ALL_MENUS.find(x=>x.id===m);
     if(!def)return;
     if(isOwner||userHasMenu(m))
@@ -932,7 +936,7 @@ function buildSidebar(){
 
 const SH_COLOR={pagi:'bk',siang:'bw',malam:'bp'};
 
-let state={sel:{pagi:true,siang:false,malam:false},shiftSaved:{pagi:false,siang:false,malam:false},biayaItems:[],biayaId:1,savedData:[],harga:{pertalite:10000,hpp_pertalite:9998,pertamax:13200,hpp_pertamax:13235,dexlite:14550,hpp_dexlite:15099,biosolar:6800,hpp_biosolar:6799},riwayatHarga:[],draft:{},midShift:{pagi:false,siang:false,malam:false},tambahNormal:{pagi:false,siang:false,malam:false},auditStok:[],bebanUsaha:[],bebanId:1};
+let state={sel:{pagi:true,siang:false,malam:false},shiftSaved:{pagi:false,siang:false,malam:false},biayaItems:[],biayaId:1,savedData:[],harga:{pertalite:10000,hpp_pertalite:9998,pertamax:13200,hpp_pertamax:13235,dexlite:14550,hpp_dexlite:15099,biosolar:6800,hpp_biosolar:6799},riwayatHarga:[],draft:{},midShift:{pagi:false,siang:false,malam:false},tambahNormal:{pagi:false,siang:false,malam:false},auditStok:[],bebanUsaha:[],bebanId:1,penerimaan:[],penerimaanId:1};
 let currentPage='input';
 let histChartInst=null;
 
@@ -1095,6 +1099,7 @@ function showPage(name){
   else if(name==='selisih')renderSelisihPage(main);
   else if(name==='histori')renderHistoriPage(main);
   else if(name==='laporan')renderLaporanPage(main);
+  else if(name==='penerimaan')renderPenerimaanPage(main);
   else if(name==='stoklaporan')renderStokLaporanPage(main);
   else if(name==='beban')renderBebanPage(main);
   else if(name==='labarugi')renderLabaRugiPage(main);
@@ -2890,6 +2895,555 @@ function printLaporan(){
 }
 
 
+
+// ═══════════════════════════════════════════════════════════════
+//  PENERIMAAN BBM
+//  Mencatat setiap pengiriman/penerimaan BBM dari supplier
+// ═══════════════════════════════════════════════════════════════
+let pnMode    = 'form';   // 'form' | 'histori'
+let pnEditId  = null;
+let pnFilter  = '';       // filter bulan YYYY-MM
+
+// ── Generate nomor DO otomatis ────────────────────────────────
+function genNomorDO(){
+  const now=new Date();
+  const y=now.getFullYear();
+  const m=String(now.getMonth()+1).padStart(2,'0');
+  const seq=String((state.penerimaanId||1)).padStart(3,'0');
+  return 'DO/'+y+'/'+m+'/'+seq;
+}
+
+// ── Hitung total volume & nilai penerimaan per periode ────────
+function getPenerimaanBulan(bulan){
+  return (state.penerimaan||[]).filter(p=>p.tanggal&&p.tanggal.slice(0,7)===bulan);
+}
+function getPenerimaanTanggal(tgl){
+  return (state.penerimaan||[]).filter(p=>p.tanggal===tgl);
+}
+
+// ── Render halaman utama ──────────────────────────────────────
+function renderPenerimaanPage(main){
+  if(!main)return;
+  if(!state.penerimaan)state.penerimaan=[];
+  if(!state.penerimaanId)state.penerimaanId=1;
+
+  const now=new Date();
+  const bulanIni=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  if(!pnFilter)pnFilter=bulanIni;
+
+  const bln=['Januari','Februari','Maret','April','Mei','Juni',
+             'Juli','Agustus','September','Oktober','November','Desember'];
+  const LB=v=>{if(!v)return'—';const[y,m]=v.split('-');return bln[parseInt(m)-1]+' '+y;};
+  const fTgl=t=>{if(!t)return'—';const[y,m,d]=t.split('-');return d+' '+bln[parseInt(m)-1].slice(0,3)+' '+y;};
+
+  // Daftar bulan yang tersedia
+  const bulanSet=new Set([bulanIni]);
+  (state.penerimaan||[]).forEach(p=>{if(p.tanggal)bulanSet.add(p.tanggal.slice(0,7));});
+  const bulanList=[...bulanSet].sort().reverse();
+
+  // Data bulan ini
+  const dataBulan=getPenerimaanBulan(pnFilter)
+    .sort((a,b)=>a.tanggal>b.tanggal?-1:1);
+
+  // Ringkasan per BBM bulan ini
+  const ringkasan={};
+  BBM.forEach(b=>ringkasan[b]={volume:0,nilai:0,count:0});
+  dataBulan.forEach(p=>{
+    BBM.forEach(b=>{
+      if(p.detail&&p.detail[b]&&p.detail[b].volume>0){
+        ringkasan[b].volume+=p.detail[b].volume||0;
+        ringkasan[b].nilai+=p.detail[b].nilai||0;
+        ringkasan[b].count++;
+      }
+    });
+  });
+  const totalVolume=BBM.reduce((s,b)=>s+ringkasan[b].volume,0);
+  const totalNilai=BBM.reduce((s,b)=>s+ringkasan[b].nilai,0);
+
+  // Edit item
+  const editItem=pnEditId?state.penerimaan.find(p=>p.id===pnEditId):null;
+
+  // ── Detail BBM untuk form ─────────────────────────────────
+  const bbmFormRows=BBM.map(b=>{
+    const ev=editItem?.detail?.[b]||{};
+    return`<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;background:var(--surface)">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span class="tag ${BT[b]}" style="font-size:12px">${BL[b]}</span>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;color:var(--text2)">
+          <input type="checkbox" id="pn-aktif-${b}" ${ev.volume>0||!editItem?'checked':''}
+            onchange="pnToggleBBM('${b}')" style="accent-color:var(--blue);width:14px;height:14px">
+          Ada penerimaan
+        </label>
+      </div>
+      <div id="pn-row-${b}" style="${ev.volume>0||!editItem?'':'display:none'}">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+          <div class="fg">
+            <label style="font-size:11px">Volume (ltr)</label>
+            <input type="text" class="inp inp-num" id="pn-vol-${b}"
+              value="${ev.volume>0?fN(ev.volume):''}" placeholder="0"
+              oninput="fmtB(this);pnHitungNilai('${b}')" style="font-size:14px;font-weight:700">
+          </div>
+          <div class="fg">
+            <label style="font-size:11px">Harga Beli/ltr (Rp)</label>
+            <input type="text" class="inp inp-num" id="pn-harga-${b}"
+              value="${ev.hargaBeli>0?fN(ev.hargaBeli):fN(state.harga['hpp_'+b]||0)}"
+              placeholder="${fN(state.harga['hpp_'+b]||0)}"
+              oninput="fmtB(this);pnHitungNilai('${b}')">
+          </div>
+          <div class="fg">
+            <label style="font-size:11px">Total Nilai (Rp)</label>
+            <div class="inp" id="pn-nilai-${b}"
+              style="background:var(--blue-bg);color:var(--blue);font-weight:700;font-size:13px;display:flex;align-items:center">
+              ${ev.nilai>0?fRF(ev.nilai):'—'}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  main.innerHTML=`
+  <div class="page-header">
+    <div>
+      <div class="page-title">🚚 Penerimaan BBM</div>
+      <div class="page-sub">Catat setiap pengiriman BBM dari supplier</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="pnMode=pnMode==='form'?'histori':'form';renderPenerimaanPage(e('main-content'))">
+        ${pnMode==='form'?'📋 Lihat Histori':'➕ Input Baru'}
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="printPenerimaan('${pnFilter}')">🖨 Print</button>
+    </div>
+  </div>
+
+  <!-- Filter bulan -->
+  <div class="card" style="padding:12px 16px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:var(--text2)">PERIODE:</span>
+      <select class="inp" onchange="pnFilter=this.value;renderPenerimaanPage(e('main-content'))"
+        style="width:180px;padding:5px 10px;font-size:13px;font-weight:600">
+        ${bulanList.map(b=>`<option value="${b}" ${b===pnFilter?'selected':''}>${LB(b)}</option>`).join('')}
+      </select>
+      <div style="margin-left:auto;display:flex;gap:16px;align-items:center;font-size:12px;flex-wrap:wrap">
+        <span style="color:var(--text2)">Total masuk: <strong>${fN(totalVolume)} ltr</strong></span>
+        <span style="color:var(--text2)">Total nilai: <strong style="color:var(--blue)">${fRF(totalNilai)}</strong></span>
+        <span style="color:var(--text2)">${dataBulan.length} pengiriman</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Ringkasan per BBM -->
+  ${totalVolume>0?`
+  <div class="g4" style="gap:10px;margin-bottom:12px">
+    ${BBM.map(b=>{
+      const r=ringkasan[b];
+      if(!r.volume)return`<div class="card" style="padding:12px;opacity:.4">
+        <span class="tag ${BT[b]}">${BL[b]}</span>
+        <div style="font-size:13px;font-weight:700;color:var(--text3);margin-top:8px">—</div>
+        <div style="font-size:11px;color:var(--text3)">Belum ada penerimaan</div>
+      </div>`;
+      return`<div class="card" style="padding:12px;border-top:3px solid var(--blue)">
+        <span class="tag ${BT[b]}">${BL[b]}</span>
+        <div style="font-size:20px;font-weight:800;margin-top:8px">${fN(r.volume)}</div>
+        <div style="font-size:11px;color:var(--text2)">liter · ${r.count}× kirim</div>
+        <div style="font-size:12px;color:var(--blue);margin-top:4px;font-weight:600">${fRF(r.nilai)}</div>
+      </div>`;
+    }).join('')}
+  </div>`:''}
+
+  ${pnMode==='form'?`
+  <!-- ════ FORM INPUT ════ -->
+  <div class="card" style="border:2px solid var(--blue-light)">
+    <div class="card-title" style="color:var(--blue)">${editItem?'✏ Edit Penerimaan':'➕ Catat Penerimaan BBM Baru'}</div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:14px">
+      <div class="fg">
+        <label>Tanggal Terima</label>
+        <input type="date" class="inp" id="pn-tanggal"
+          value="${editItem?.tanggal||new Date().toISOString().slice(0,10)}"
+          max="${new Date().toISOString().slice(0,10)}">
+      </div>
+      <div class="fg">
+        <label>Nomor DO / Surat Jalan</label>
+        <input type="text" class="inp" id="pn-nodo"
+          value="${editItem?.noDO||genNomorDO()}" placeholder="DO/2026/06/001">
+      </div>
+      <div class="fg">
+        <label>Supplier</label>
+        <input type="text" class="inp" id="pn-supplier"
+          value="${editItem?.supplier||''}" placeholder="cth: TBBM Badas" list="pn-supplier-list">
+        <datalist id="pn-supplier-list">
+          ${[...new Set((state.penerimaan||[]).map(p=>p.supplier).filter(Boolean))].map(s=>`<option value="${s}">`).join('')}
+          <option value="TBBM Badas">
+          <option value="Pertamina Mataram">
+          <option value="Pertamina Dompu">
+        </datalist>
+      </div>
+      <div class="fg">
+        <label>Diterima Oleh</label>
+        <input type="text" class="inp" id="pn-diterima"
+          value="${editItem?.diterimaoOleh||currentUser?.name||''}"
+          placeholder="Nama penerima">
+      </div>
+      <div class="fg">
+        <label>No. Polisi Tangki</label>
+        <input type="text" class="inp" id="pn-nopol"
+          value="${editItem?.noPol||''}" placeholder="cth: DR 1234 AB">
+      </div>
+      <div class="fg">
+        <label>No. Pengiriman (jika 1 kirim = beberapa DO)</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span style="font-size:12px;color:var(--text2)">DO ke-</span>
+          <input type="number" class="inp" id="pn-do-ke" min="1" max="99"
+            value="${editItem?.doKe||1}" style="width:60px;text-align:center">
+          <span style="font-size:12px;color:var(--text2)">dari</span>
+          <input type="number" class="inp" id="pn-do-total" min="1" max="99"
+            value="${editItem?.doTotal||1}" style="width:60px;text-align:center">
+          <span style="font-size:12px;color:var(--text2)">DO</span>
+        </div>
+      </div>
+      <div class="fg">
+        <label>No. Referensi Pengiriman <span style="font-size:10px;color:var(--text3)">(jika 1 batch = beberapa DO)</span></label>
+        <input type="text" class="inp" id="pn-ref"
+          value="${editItem?.refPengiriman||''}"
+          placeholder="cth: REF/2026/06/001 (sama untuk semua DO satu kirim)"
+          list="pn-ref-list">
+        <datalist id="pn-ref-list">
+          ${[...new Set((state.penerimaan||[]).map(p=>p.refPengiriman).filter(Boolean))].slice(0,5).map(r=>`<option value="${r}">`).join('')}
+        </datalist>
+      </div>
+      <div class="fg">
+        <label>Keterangan</label>
+        <input type="text" class="inp" id="pn-ket"
+          value="${editItem?.keterangan||''}" placeholder="Opsional">
+      </div>
+    </div>
+
+    <!-- Detail per BBM -->
+    <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:10px">Detail Volume per Produk</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:14px">
+      ${bbmFormRows}
+    </div>
+
+    <!-- Total -->
+    <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);
+      padding:12px 14px;margin-bottom:14px;display:flex;gap:24px;flex-wrap:wrap">
+      <div><div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Total Volume</div>
+        <div id="pn-total-vol" style="font-size:18px;font-weight:800;color:var(--blue)">0 ltr</div></div>
+      <div><div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase">Total Nilai</div>
+        <div id="pn-total-nilai" style="font-size:18px;font-weight:800;color:var(--blue)">Rp 0</div></div>
+      <div style="margin-left:auto;align-self:flex-end">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px">
+          <input type="checkbox" id="pn-verified" ${editItem?.verified?'checked':''}
+            style="accent-color:var(--green);width:14px;height:14px">
+          <span style="font-weight:600;color:var(--green)">✓ Sudah diverifikasi / sesuai fisik</span>
+        </label>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      ${editItem?`<button class="btn btn-ghost" onclick="pnEditId=null;renderPenerimaanPage(e('main-content'))">Batal</button>`:''}
+      <button class="btn btn-primary" onclick="pnSimpan(${editItem?`'${editItem.id}'`:null})">
+        💾 ${editItem?'Simpan Perubahan':'Catat Penerimaan'}
+      </button>
+    </div>
+  </div>`:`
+
+  <!-- ════ HISTORI ════ -->
+  <!-- Ringkasan per Batch Pengiriman -->
+  ${(()=>{
+    // Kelompokkan berdasarkan refPengiriman atau noDO jika tidak ada ref
+    const batches={};
+    dataBulan.forEach(p=>{
+      const key=p.refPengiriman||(p.doTotal>1?'BATCH_'+p.supplier+'_'+p.tanggal:null);
+      if(!key)return; // skip DO tunggal
+      if(!batches[key])batches[key]={ref:key,supplier:p.supplier,tanggal:p.tanggal,dos:[],volume:{},nilai:0};
+      batches[key].dos.push(p);
+      BBM.forEach(b=>{
+        batches[key].volume[b]=(batches[key].volume[b]||0)+(p.detail?.[b]?.volume||0);
+        batches[key].nilai+=(p.detail?.[b]?.nilai||0);
+      });
+    });
+    const batchList=Object.values(batches);
+    if(!batchList.length)return'';
+    return'<div class="card" style="margin-bottom:12px;border-left:4px solid var(--blue)">'
+      +'<div class="card-title" style="color:var(--blue)">📦 Rekap Per Batch Pengiriman</div>'
+      +'<div style="display:flex;flex-direction:column;gap:8px">'
+      +batchList.map(batch=>{
+        const allVerified=batch.dos.every(p=>p.verified);
+        const totalVol=BBM.reduce((s,b)=>s+(batch.volume[b]||0),0);
+        return'<div style="background:var(--surface2);border-radius:var(--radius);padding:10px 14px">'
+          +'<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">'
+          +'<div>'
+          +'<div style="font-weight:700;font-size:13px">'+esc(batch.ref)+'</div>'
+          +'<div style="font-size:11px;color:var(--text2)">'+esc(batch.supplier||'')
+          +' &nbsp;·&nbsp; '+batch.dos.length+' DO &nbsp;·&nbsp; '+fTgl(batch.tanggal)+'</div>'
+          +'</div>'
+          +'<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">'
+          +BBM.map(b=>batch.volume[b]>0?'<div style="font-size:12px"><span class="tag '+BT[b]+'" style="font-size:10px">'+BL[b]+'</span> <strong>'+fN(batch.volume[b])+' ltr</strong></div>':'').join('')
+          +'<div style="font-size:12px;font-weight:700;color:var(--blue)">'+fRF(batch.nilai)+'</div>'
+          +'<div style="font-size:11px">'+(allVerified?'<span style="color:var(--green)">✓ Semua Verified</span>':'<span style="color:var(--amber)">⏳ Sebagian Pending</span>')+'</div>'
+          +'</div></div>'
+          +'<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">'
+          +batch.dos.map(p=>'<span style="font-size:10px;background:var(--blue-bg);color:var(--blue);padding:2px 8px;border-radius:10px;font-family:monospace">'
+            +esc(p.noDO)+(p.doTotal>1?' ('+p.doKe+'/'+p.doTotal+')':'')+' = '+fN(BBM.reduce((s,b)=>s+(p.detail?.[b]?.volume||0),0))+' ltr</span>').join('')
+          +'</div>'
+          +'</div>';
+      }).join('')
+      +'</div></div>';
+  })()}
+
+  <div class="card">
+    <div class="card-title">Histori Penerimaan — ${LB(pnFilter)}</div>
+    ${dataBulan.length===0?`<div class="empty-state">Belum ada penerimaan di ${LB(pnFilter)}.</div>`:`
+    <div class="tbl-wrap">
+    <table class="stbl" style="font-size:12px">
+      <thead>
+        <tr>
+          <th>Tanggal</th>
+          <th>No. DO</th>
+          <th>Pengiriman</th>
+          <th>Supplier</th>
+          ${BBM.map(b=>`<th style="text-align:right">${BL[b]} (ltr)</th>`).join('')}
+          <th style="text-align:right">Total Nilai</th>
+          <th>Diterima</th>
+          <th style="text-align:center">Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+      ${dataBulan.map(p=>{
+        const totalNilaiP=BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0);
+        const totalVolP=BBM.reduce((s,b)=>s+(p.detail?.[b]?.volume||0),0);
+        return`<tr>
+          <td style="white-space:nowrap;font-weight:600">${fTgl(p.tanggal)}</td>
+          <td style="font-family:monospace;font-size:11px">
+            ${esc(p.noDO||'—')}
+            ${p.doTotal>1?`<div style="font-size:10px;color:var(--blue);margin-top:2px">DO ${p.doKe||1} dari ${p.doTotal}</div>`:''}
+          </td>
+          <td style="font-size:11px">
+            ${p.refPengiriman?`<div style="font-weight:600;color:var(--text)">${esc(p.refPengiriman)}</div>`:''}
+            ${p.doTotal>1&&p.refPengiriman?`<div style="font-size:10px;color:var(--text3)">Batch ${p.doKe||1}/${p.doTotal}</div>`:'<span style="color:var(--text3)">—</span>'}
+          </td>
+          <td>${esc(p.supplier||'—')}</td>
+          ${BBM.map(b=>`<td style="text-align:right">${p.detail?.[b]?.volume>0?fN(p.detail[b].volume):'—'}</td>`).join('')}
+          <td style="text-align:right;color:var(--blue);font-weight:600">${fRF(totalNilaiP)}</td>
+          <td style="font-size:11px">${esc(p.diterimaoOleh||'—')}</td>
+          <td style="text-align:center">
+            ${p.verified
+              ?'<span style="color:var(--green);font-size:11px;font-weight:600">✓ Verified</span>'
+              :'<span style="color:var(--amber);font-size:11px">⏳ Pending</span>'}
+          </td>
+          <td style="white-space:nowrap">
+            <button class="btn btn-ghost btn-sm" onclick="pnEditId='${p.id}';pnMode='form';renderPenerimaanPage(e('main-content'))"
+              style="font-size:10px;padding:3px 7px">✏</button>
+            <button class="btn btn-del btn-sm" onclick="pnHapus('${p.id}')"
+              style="font-size:10px;padding:3px 7px">✕</button>
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+      <tfoot>
+        <tr style="background:var(--surface2);font-weight:700">
+          <td colspan="3">TOTAL ${LB(pnFilter)}</td>
+          ${BBM.map(b=>`<td style="text-align:right">${fN(ringkasan[b].volume)} ltr</td>`).join('')}
+          <td style="text-align:right;color:var(--blue)">${fRF(totalNilai)}</td>
+          <td colspan="3"></td>
+        </tr>
+      </tfoot>
+    </table>
+    </div>`}
+  </div>`}
+  `;
+
+  // Hitung total setelah render
+  setTimeout(pnUpdateTotal,50);
+}
+
+// ── Toggle row BBM di form ────────────────────────────────────
+function pnToggleBBM(b){
+  const chk=e('pn-aktif-'+b);
+  const row=e('pn-row-'+b);
+  if(row)row.style.display=chk?.checked?'block':'none';
+  if(!chk?.checked){
+    const vol=e('pn-vol-'+b);const har=e('pn-harga-'+b);
+    if(vol)vol.value='';if(har)har.value='';
+    const nEl=e('pn-nilai-'+b);if(nEl)nEl.textContent='—';
+  }
+  pnUpdateTotal();
+}
+
+// ── Hitung nilai otomatis ─────────────────────────────────────
+function pnHitungNilai(b){
+  const vol=parseInt((e('pn-vol-'+b)?.value||'0').replace(/\./g,''))||0;
+  const harga=parseInt((e('pn-harga-'+b)?.value||'0').replace(/\./g,''))||0;
+  const nilai=vol*harga;
+  const nEl=e('pn-nilai-'+b);
+  if(nEl){nEl.textContent=nilai>0?fRF(nilai):'—';nEl.style.color=nilai>0?'var(--blue)':'var(--text3)';}
+  pnUpdateTotal();
+}
+
+function pnUpdateTotal(){
+  let totalVol=0,totalNilai=0;
+  BBM.forEach(b=>{
+    const chk=e('pn-aktif-'+b);
+    if(!chk?.checked)return;
+    const vol=parseInt((e('pn-vol-'+b)?.value||'0').replace(/\./g,''))||0;
+    const harga=parseInt((e('pn-harga-'+b)?.value||'0').replace(/\./g,''))||0;
+    totalVol+=vol;totalNilai+=vol*harga;
+  });
+  const tvEl=e('pn-total-vol');const tnEl=e('pn-total-nilai');
+  if(tvEl)tvEl.textContent=fN(totalVol)+' ltr';
+  if(tnEl)tnEl.textContent=fRF(totalNilai);
+}
+
+// ── Simpan penerimaan ─────────────────────────────────────────
+function pnSimpan(existingId){
+  const tanggal=e('pn-tanggal')?.value||'';
+  const noDO=(e('pn-nodo')?.value||'').trim();
+  const supplier=(e('pn-supplier')?.value||'').trim();
+  const diterimaoOleh=(e('pn-diterima')?.value||'').trim();
+  const noPol=(e('pn-nopol')?.value||'').trim();
+  const keterangan=(e('pn-ket')?.value||'').trim();
+  const verified=e('pn-verified')?.checked||false;
+  const doKe=parseInt(e('pn-do-ke')?.value||'1')||1;
+  const doTotal=parseInt(e('pn-do-total')?.value||'1')||1;
+  const refPengiriman=(e('pn-ref')?.value||'').trim();
+
+  if(!tanggal){toast('⚠ Tanggal wajib diisi!');return;}
+  if(!noDO){toast('⚠ Nomor DO wajib diisi!');return;}
+  if(!supplier){toast('⚠ Nama supplier wajib diisi!');return;}
+
+  // Kumpulkan detail per BBM
+  const detail={};
+  let adaVolume=false;
+  BBM.forEach(b=>{
+    const chk=e('pn-aktif-'+b);
+    if(!chk?.checked)return;
+    const vol=parseInt((e('pn-vol-'+b)?.value||'0').replace(/\./g,''))||0;
+    const hargaBeli=parseInt((e('pn-harga-'+b)?.value||'0').replace(/\./g,''))||0;
+    if(vol>0){
+      detail[b]={volume:vol,hargaBeli,nilai:vol*hargaBeli};
+      adaVolume=true;
+    }
+  });
+
+  if(!adaVolume){toast('⚠ Isi volume minimal satu produk!');return;}
+
+  if(!state.penerimaan)state.penerimaan=[];
+  if(!state.penerimaanId)state.penerimaanId=1;
+
+  const totalVolume=BBM.reduce((s,b)=>s+(detail[b]?.volume||0),0);
+  const totalNilai=BBM.reduce((s,b)=>s+(detail[b]?.nilai||0),0);
+
+  if(existingId){
+    const idx=state.penerimaan.findIndex(p=>p.id===existingId);
+    if(idx>=0){
+      state.penerimaan[idx]={...state.penerimaan[idx],
+        tanggal,noDO,supplier,diterimaoOleh,noPol,keterangan,
+        doKe,doTotal,refPengiriman,
+        detail,totalVolume,totalNilai,verified,
+        updatedAt:new Date().toISOString()};
+    }
+    toast('✓ Data penerimaan diperbarui!');
+  }else{
+    state.penerimaan.unshift({
+      id:'PN'+Date.now(),
+      tanggal,noDO,supplier,diterimaoOleh,noPol,keterangan,
+      doKe,doTotal,refPengiriman,
+      detail,totalVolume,totalNilai,verified,
+      createdAt:new Date().toISOString(),
+      createdBy:currentUser?.name||'',
+      seq:state.penerimaanId++
+    });
+    toast('✓ Penerimaan berhasil dicatat!');
+  }
+
+  dbSave();
+  if(_fbInited)fbSaveAppState().catch(()=>{});
+  pnEditId=null;
+  pnMode='histori';
+  renderPenerimaanPage(e('main-content'));
+}
+
+function pnHapus(id){
+  const p=state.penerimaan.find(x=>x.id===id);
+  if(!p)return;
+  if(!confirm('Hapus penerimaan '+p.noDO+' tanggal '+p.tanggal+'?'))return;
+  state.penerimaan=state.penerimaan.filter(x=>x.id!==id);
+  dbSave();
+  if(_fbInited)fbSaveAppState().catch(()=>{});
+  toast('✓ Data penerimaan dihapus.');
+  renderPenerimaanPage(e('main-content'));
+}
+
+// ── Print laporan penerimaan ──────────────────────────────────
+function printPenerimaan(bulan){
+  const bln=['Januari','Februari','Maret','April','Mei','Juni',
+             'Juli','Agustus','September','Oktober','November','Desember'];
+  const LB=v=>{if(!v)return'';const[y,m]=v.split('-');return bln[parseInt(m)-1]+' '+y;};
+  const fTgl=t=>{if(!t)return'—';const[y,m,d]=t.split('-');return d+' '+bln[parseInt(m)-1]+' '+y;};
+  const data=getPenerimaanBulan(bulan).sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+  const profil=getProfil();
+
+  // Ringkasan
+  const ring={};BBM.forEach(b=>ring[b]={volume:0,nilai:0});
+  data.forEach(p=>BBM.forEach(b=>{
+    ring[b].volume+=(p.detail?.[b]?.volume||0);
+    ring[b].nilai+=(p.detail?.[b]?.nilai||0);
+  }));
+  const totVol=BBM.reduce((s,b)=>s+ring[b].volume,0);
+  const totNilai=BBM.reduce((s,b)=>s+ring[b].nilai,0);
+
+  const w=window.open('','_blank','width=900,height=700');
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<title>Laporan Penerimaan BBM '+LB(bulan)+'</title>'
+    +'<style>body{font-family:"Times New Roman",serif;font-size:12px;padding:20px 28px}'
+    +'table{width:100%;border-collapse:collapse;margin:10px 0}'
+    +'th{background:#f0f0f0;font-weight:bold;padding:5px 8px;border:1px solid #999;font-size:11px}'
+    +'td{padding:5px 8px;border:1px solid #ddd}'
+    +'.right{text-align:right}.center{text-align:center}'
+    +'.tot{font-weight:bold;background:#e8e8e8;border-top:2px solid #999}'
+    +'@media print{@page{margin:1.5cm;size:A4}button{display:none}}</style></head><body>'
+    +'<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">'
+    +'<h2 style="margin:0;font-size:16px">'+(profil.namaSPBU||profil.nama||'SPBU')+'</h2>'
+    +'<h2 style="margin:4px 0;font-size:14px">LAPORAN PENERIMAAN BBM</h2>'
+    +'<div>Periode: '+LB(bulan)+'</div>'
+    +'<div style="font-size:11px;color:#666">Dicetak: '+new Date().toLocaleDateString('id-ID',{dateStyle:'long'})+'</div>'
+    +'</div>'
+    +'<h3 style="font-size:12px;margin:0 0 6px">Ringkasan per Produk</h3>'
+    +'<table><tr><th>Produk</th><th class="right">Total Volume (ltr)</th><th class="right">Total Nilai</th></tr>'
+    +BBM.map(b=>'<tr><td>'+BL[b]+'</td><td class="right">'+fN(ring[b].volume)+'</td><td class="right">'+fRF(ring[b].nilai)+'</td></tr>').join('')
+    +'<tr class="tot"><td>TOTAL</td><td class="right">'+fN(totVol)+' ltr</td><td class="right">'+fRF(totNilai)+'</td></tr>'
+    +'</table>'
+    +'<h3 style="font-size:12px;margin:16px 0 6px">Detail Penerimaan</h3>'
+    +'<table><tr><th>Tgl</th><th>No. DO</th><th>Supplier</th>'
+    +BBM.map(b=>'<th class="right">'+BL[b]+'</th>').join('')
+    +'<th class="right">Total Nilai</th><th>Diterima</th><th class="center">Status</th></tr>'
+    +data.map(p=>{
+      const tn=BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0);
+      return'<tr><td style="white-space:nowrap">'+fTgl(p.tanggal)+'</td>'
+        +'<td style="font-size:10px;font-family:monospace">'+esc(p.noDO||'—')+'</td>'
+        +'<td>'+esc(p.supplier||'—')+'</td>'
+        +BBM.map(b=>'<td class="right">'+(p.detail?.[b]?.volume>0?fN(p.detail[b].volume):'—')+'</td>').join('')
+        +'<td class="right">'+fRF(tn)+'</td>'
+        +'<td style="font-size:10px">'+esc(p.diterimaoOleh||'—')+'</td>'
+        +'<td class="center" style="font-size:10px">'+(p.verified?'✓ Verified':'Pending')+'</td></tr>';
+    }).join('')
+    +'<tr class="tot"><td colspan="3">TOTAL</td>'
+    +BBM.map(b=>'<td class="right">'+fN(ring[b].volume)+' ltr</td>').join('')
+    +'<td class="right">'+fRF(totNilai)+'</td><td colspan="2"></td></tr>'
+    +'</table>'
+    +'<div style="margin-top:32px;display:flex;justify-content:flex-end;gap:60px">'
+    +'<div style="text-align:center"><div style="width:130px;border-top:1px solid #000;padding-top:4px;margin-top:40px">Mengetahui,</div><div>Owner</div></div>'
+    +'<div style="text-align:center"><div style="width:130px;border-top:1px solid #000;padding-top:4px;margin-top:40px">Diterima oleh,</div><div>Manager</div></div>'
+    +'</div></body></html>';
+
+  w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
+}
+
+
 // ═══════════════════════════════════════════════════════════════
 //  LAPORAN STOK BBM — NYAWA SPBU
 // ═══════════════════════════════════════════════════════════════
@@ -2928,10 +3482,12 @@ function renderStokLaporanPage(main){
   // ── Hitung per baris (hari) per BBM ──────────────────────
   function hitungHari(rec){
     const result={};
+    // Ambil data penerimaan BBM untuk tanggal ini
+    const penerimaanHari=getPenerimaanTanggal(rec.tanggal);
     BBM.forEach(b=>{
-      let stokAwal=0,penerimaan=0,jual=0,losses=0,plus=0,stokSistem=0;
-      let shiftPertama=rec.shifts[0];
-      // Stok awal = awal shift pertama
+      let stokAwal=0,penerimaan=0,jual=0,losses=0,plus=0;
+      let penerimaanDO=0,nilaiPenerimaan=0;
+      const shiftPertama=rec.shifts[0];
       stokAwal=(rec.shiftData[shiftPertama]?.[b]?.awal)||0;
       rec.shifts.forEach(sh=>{
         const sd=rec.shiftData[sh]?.[b]||{};
@@ -2940,14 +3496,25 @@ function renderStokLaporanPage(main){
         losses+=sd.losses||0;
         plus+=sd.plus||0;
       });
-      // Stok sistem = awal + penerimaan - jual
-      stokSistem=Math.max(0,stokAwal+penerimaan-jual);
-      // Stok akhir efektif = stok akhir shift terakhir
+      // Penerimaan dari modul Penerimaan BBM (dokumen resmi DO)
+      penerimaanHari.forEach(p=>{
+        if(p.detail?.[b]?.volume>0){
+          penerimaanDO+=p.detail[b].volume;
+          nilaiPenerimaan+=p.detail[b].nilai||0;
+        }
+      });
+      // Total penerimaan = DO resmi + tambah mid-shift + tambah normal
+      // Keduanya saling melengkapi:
+      //   - penerimaan (shift) = volume yang masuk ke tangki saat shift
+      //   - penerimaanDO = dokumen resmi dari supplier (untuk rekonsiliasi)
+      // Untuk stok sistem: pakai data shift (lebih akurat untuk kalkulasi harian)
+      // Untuk rekonsiliasi: tampilkan keduanya agar bisa dibandingkan
+      const penerimaanAktual=penerimaan; // tetap pakai data shift untuk stok
+      const stokSistem=Math.max(0,stokAwal+penerimaanAktual-jual);
       const shiftTerakhir=rec.shifts[rec.shifts.length-1];
       const stokAkhirFisik=(rec.shiftData[shiftTerakhir]?.[b]?.stokAkhirEfektif)||stokSistem;
-      // Selisih = stok sistem - stok akhir fisik - losses yang sudah tercatat
-      const selisih=losses; // losses sudah = stok sistem - stok fisik
-      result[b]={stokAwal,penerimaan,jual,losses,plus,stokSistem,stokAkhirFisik,selisih};
+      result[b]={stokAwal,penerimaan:penerimaanAktual,penerimaanDO,
+        nilaiPenerimaan,jual,losses,plus,stokSistem,stokAkhirFisik,selisih:losses};
     });
     return result;
   }
@@ -3097,7 +3664,8 @@ function renderStokLaporanPage(main){
         <tr style="background:var(--surface2);font-size:10px">
           ${BBM.map(()=>`
             <th style="border-left:2px solid var(--border2);color:var(--text2)">Stok Awal</th>
-            <th style="color:var(--text2)">Penerimaan</th>
+            <th style="color:var(--blue)">Tambah Shift</th>
+            <th style="color:var(--green)">Terima DO</th>
             <th style="color:var(--text2)">Terjual</th>
             <th style="color:var(--text2)">Stok Sistem</th>
             <th style="color:var(--text2)">Stok Fisik</th>
@@ -3118,7 +3686,8 @@ function renderStokLaporanPage(main){
             const selisihVal=h.losses>0?`-${fN(h.losses)}`:(h.plus>0?`+${fN(h.plus)}`:'0');
             const selisihColor=h.losses>LOSSES_KRITIS[b]?'var(--red)':h.losses>LOSSES_TOLERANSI[b]?'var(--amber)':h.plus>0?'var(--purple)':'var(--green)';
             return`<td style="text-align:right;border-left:2px solid var(--border2)">${fN(h.stokAwal)}</td>
-            <td style="text-align:right;color:var(--blue)">${h.penerimaan>0?'+'+fN(h.penerimaan):'—'}</td>
+            <td style="text-align:right;color:var(--blue)" title="Tambah mid-shift + normal">${h.penerimaan>0?'+'+fN(h.penerimaan):'—'}</td>
+            <td style="text-align:right;color:var(--green);font-weight:${h.penerimaanDO>0?600:400}" title="Penerimaan DO resmi">${h.penerimaanDO>0?'+'+fN(h.penerimaanDO):'—'}</td>
             <td style="text-align:right">${fN(h.jual)}</td>
             <td style="text-align:right;font-weight:600">${fN(h.stokSistem)}</td>
             <td style="text-align:right;font-weight:600">${fN(h.stokAkhirFisik)}</td>
@@ -6280,6 +6849,8 @@ async function fbSaveAppState(){
       riwayatHarga: state.riwayatHarga||[],
       profil: getProfil(),
       bbmConfig: loadBBMConfig(),
+      penerimaan: state.penerimaan||[],
+      penerimaanId: state.penerimaanId||1,
       updatedAt: new Date().toISOString()
     });
     return true;
@@ -6293,8 +6864,10 @@ async function fbLoadAppState(){
     const snap = await fbPath(FB_ROOT+'/appstate').get();
     if(snap.exists()){
       const d = snap.val();
-      if(d.bebanUsaha) state.bebanUsaha = d.bebanUsaha;
-      if(d.bebanId)    state.bebanId    = d.bebanId;
+      if(d.bebanUsaha)   state.bebanUsaha   = d.bebanUsaha;
+      if(d.bebanId)      state.bebanId      = d.bebanId;
+      if(d.penerimaan)   state.penerimaan   = d.penerimaan;
+      if(d.penerimaanId) state.penerimaanId = d.penerimaanId;
       if(d.bbmConfig&&Array.isArray(d.bbmConfig)){
         saveBBMConfig(d.bbmConfig); // Rebuild BBM globals
       }
