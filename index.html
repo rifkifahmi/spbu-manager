@@ -1937,6 +1937,8 @@ function saveData(){
   state.draft={};state.shiftSaved={pagi:false,siang:false,malam:false};state.midShift={pagi:false,siang:false,malam:false};
   dbSave();
   toast('✓ Data '+tanggal+' tersimpan!');
+  // Sync ke Firebase (background, tidak blok UI)
+  if(_fbInited) fbSaveDay(rec).catch(()=>{});
   previewOpen=false;
   showPage('stok');
   // Auto cloud sync jika URL sudah diatur
@@ -3452,7 +3454,9 @@ function addBeban2(){
   if(!state.bebanUsaha)state.bebanUsaha=[];
   if(!state.bebanId)state.bebanId=1;
   state.bebanUsaha.push({id:state.bebanId++,bulan:bebanBulan,kategori:kat,subkategori:sub,keterangan:ket,nominal:nom,recurring,createdAt:new Date().toISOString()});
-  dbSave();toast('✓ Beban ditambahkan');
+  dbSave();
+  if(_fbInited) fbSaveAppState().catch(()=>{});
+  toast('✓ Beban ditambahkan');
   renderBebanPage(e('main-content'));
 }
 
@@ -4568,9 +4572,9 @@ function savePengaturanProfil(){
   if(!nama){toast('⚠ Nama SPBU tidak boleh kosong!');return;}
   saveProfil({nama,namaSPBU:nama,noSpbu,alamat,telp,owner,email});
   toast('✓ Profil SPBU disimpan!');
-  // Update topbar
   const brandEl=document.querySelector('.topbar-brand');
   if(brandEl)brandEl.textContent=nama||'SPBU Manager';
+  if(_fbInited) fbSaveAppState().catch(()=>{});
 }
 
 // ── Aksi User ────────────────────────────────────────────
@@ -5393,6 +5397,7 @@ function updateHarga(b){
   const mgRaw=parseInt((e('mg-'+b)?.value||'').replace(/\./g,''))||0;
   const hppCalc=hjRaw-mgRaw; // HPP = Harga Jual - Margin
   state.harga[b]=hjRaw;state.harga['hpp_'+b]=hppCalc;
+  if(_fbInited) setTimeout(()=>fbSaveAppState().catch(()=>{}),500);
   const m=mgRaw;const pct=hjRaw>0?(m/hjRaw*100):0;
   // Update tampilan HPP otomatis
   const hppEl=e('hpp-display-'+b);if(hppEl){hppEl.textContent='Rp '+fN(hppCalc);hppEl.style.color=hppCalc>=0?'var(--blue)':'var(--red)';}
@@ -5726,76 +5731,232 @@ async function cloudSyncSilent(){
 // auto-backup terintegrasi di dbSave utama
 
 // ─── CLOUD SYNC ──────────────────────────────────────────────
-const CLOUD_KEY='spbu_cloud_url';
-function getCloudUrl(){return localStorage.getItem(CLOUD_KEY)||'';}
-function setCloudUrl(url){localStorage.setItem(CLOUD_KEY,url);}
+// ═══════════════════════════════════════════════════════════════
+//  FIREBASE REALTIME DATABASE — MULTI-DEVICE SYNC
+//  Menggantikan Apps Script lama
+// ═══════════════════════════════════════════════════════════════
 
-// Status indikator di topbar
-function setCloudStatus(status,msg){
-  const dot=document.querySelector('.db-dot');
-  const badge=document.querySelector('.db-badge');
-  if(!dot||!badge)return;
-  const map={
-    active:  {bg:'#4CAF50',text:'● Cloud Aktif'},
-    syncing: {bg:'#F5C518',text:'↻ Menyinkron...'},
-    error:   {bg:'#e53935',text:'✕ Gagal Sync'},
-    local:   {bg:'#4CAF50',text:'● LocalStorage'},
-    loading: {bg:'#F5C518',text:'↻ Memuat...'},
-  };
-  const s=map[status]||map.local;
-  dot.style.background=s.bg;
-  badge.querySelector('span+*')&&(badge.lastChild.textContent=' '+(msg||s.text));
-  if(!badge.dataset.orig)badge.dataset.orig=badge.textContent;
-  badge.innerHTML=`<span class="db-dot" style="background:${s.bg}"></span> ${msg||s.text}`;
-}
+// ── Konfigurasi Firebase ─────────────────────────────────────
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCKWvOV4r7yHm6jq773cI72sY_3-hxXIoc",
+  authDomain: "spbu-manager-efcd2.firebaseapp.com",
+  databaseURL: "https://spbu-manager-efcd2-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "spbu-manager-efcd2",
+  storageBucket: "spbu-manager-efcd2.firebasestorage.app",
+  messagingSenderId: "258028362337",
+  appId: "1:258028362337:web:a142ff5b757d48508e2820"
+};
 
-// Kirim data satu hari ke cloud
-async function cloudSave(recData){
-  const url=getCloudUrl();
-  if(!url)return {ok:false,msg:'URL belum diatur'};
-  setCloudStatus('syncing');
+// ── State Firebase ───────────────────────────────────────────
+let _fbApp    = null;
+let _fbDb     = null;
+let _fbInited = false;
+let _fbOnline = false;
+let _fbListeners = {};  // tanggal → listener unsubscribe
+
+// ── Inisialisasi Firebase ────────────────────────────────────
+async function fbInit(){
+  if(_fbInited) return true;
   try{
-    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({action:'save',data:recData})});
-    const json=await res.json();
-    if(json.status==='ok'){setCloudStatus('active','● Tersimpan '+recData.tanggal);return {ok:true};}
-    setCloudStatus('error','✕ '+json.msg);return {ok:false,msg:json.msg};
-  }catch(err){setCloudStatus('error','✕ Tidak terhubung');return {ok:false,msg:err.message};}
-}
-
-// Muat semua data dari cloud
-async function cloudLoad(){
-  const url=getCloudUrl();
-  if(!url)return {ok:false,msg:'URL belum diatur'};
-  setCloudStatus('loading','↻ Memuat dari cloud...');
-  try{
-    const res=await fetch(url+'?action=load');
-    const json=await res.json();
-    if(json.status==='ok'){
-      state.savedData=json.data||[];
-      dbSave();
-      setCloudStatus('active','● Cloud Aktif');
-      return {ok:true,count:json.data.length};
+    // Load Firebase SDK dari CDN
+    if(!window.firebase){
+      await loadScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js');
+      await loadScript('https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js');
     }
-    setCloudStatus('error','✕ '+json.msg);return {ok:false,msg:json.msg};
-  }catch(err){setCloudStatus('error','✕ Tidak terhubung');return {ok:false,msg:err.message};}
+    if(!window.firebase) throw new Error('Firebase SDK gagal dimuat');
+    // Init app (hindari duplikat)
+    try{
+      _fbApp = firebase.app();
+    }catch(e){
+      _fbApp = firebase.initializeApp(FIREBASE_CONFIG);
+    }
+    _fbDb = firebase.database();
+    _fbInited = true;
+    _fbOnline = true;
+    setCloudStatus('active','● Firebase Terhubung');
+    return true;
+  }catch(err){
+    console.error('Firebase init error:', err);
+    setCloudStatus('error','✕ Firebase gagal');
+    return false;
+  }
 }
 
-// Kirim semua data lokal ke cloud (full sync)
-async function cloudSyncAll(){
-  const url=getCloudUrl();
-  if(!url){toast('⚠ URL Apps Script belum diatur!');return;}
-  if(!state.savedData.length){toast('Tidak ada data untuk disinkronkan.');return;}
-  setCloudStatus('syncing');
-  let ok=0,fail=0;
-  for(const rec of state.savedData){
-    const r=await cloudSave(rec);
-    if(r.ok)ok++;else fail++;
-  }
-  if(fail===0){toast('✓ Semua '+ok+' data berhasil disinkronkan ke cloud!');setCloudStatus('active','● '+ok+' data tersinkron');}
-  else{toast('⚠ '+ok+' berhasil, '+fail+' gagal.');setCloudStatus('error','✕ '+fail+' gagal');}
-  renderDBPage(e('main-content'));
+function loadScript(src){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector('script[src="'+src+'"]')){resolve();return;}
+    const s=document.createElement('script');
+    s.src=src; s.onload=resolve; s.onerror=reject;
+    document.head.appendChild(s);
+  });
 }
+
+// ── Path helper ──────────────────────────────────────────────
+function fbPath(path){ return _fbDb.ref(path); }
+const FB_ROOT = 'spbu_v1';  // root node di Firebase
+
+// ── Simpan satu hari ke Firebase ─────────────────────────────
+async function fbSaveDay(rec){
+  if(!rec||!rec.tanggal) return false;
+  if(!await fbInit()) return false;
+  try{
+    setCloudStatus('syncing','↻ Menyimpan...');
+    await fbPath(FB_ROOT+'/data/'+rec.tanggal).set(rec);
+    setCloudStatus('active','● Tersimpan '+rec.tanggal);
+    return true;
+  }catch(err){
+    setCloudStatus('error','✕ '+err.message);
+    return false;
+  }
+}
+
+// ── Muat semua data dari Firebase ────────────────────────────
+async function fbLoadAll(){
+  if(!await fbInit()) return false;
+  try{
+    setCloudStatus('loading','↻ Memuat data...');
+    const snap = await fbPath(FB_ROOT+'/data').get();
+    if(snap.exists()){
+      const obj = snap.val();
+      const rows = Object.values(obj).sort((a,b)=>a.tanggal>b.tanggal?-1:1);
+      state.savedData = rows;
+      dbSave();
+      setCloudStatus('active','● '+rows.length+' hari data dimuat');
+      toast('✓ '+rows.length+' hari data dimuat dari Firebase');
+    }else{
+      setCloudStatus('active','● Firebase Aktif (belum ada data)');
+    }
+    return true;
+  }catch(err){
+    setCloudStatus('error','✕ Gagal muat: '+err.message);
+    return false;
+  }
+}
+
+// ── Realtime listener — auto-update saat ada perubahan ───────
+function fbStartListener(){
+  if(!_fbInited||!_fbDb) return;
+  // Dengarkan perubahan data harian
+  const ref = fbPath(FB_ROOT+'/data');
+  ref.on('value', snap=>{
+    if(!snap.exists()) return;
+    const obj = snap.val();
+    const rows = Object.values(obj).sort((a,b)=>a.tanggal>b.tanggal?-1:1);
+    // Merge: jangan timpa draft yang sedang diisi
+    const currentTgl = document.getElementById('f-tanggal')?.value;
+    state.savedData = rows;
+    dbSave();
+    // Update UI tanpa mengganggu form yang sedang diisi
+    updateBackupStatus();
+    // Refresh dashboard/histori jika sedang dibuka
+    if(currentPage==='dashboard') showPage('dashboard');
+    if(currentPage==='histori')   showPage('histori');
+    setCloudStatus('active','● Live · '+rows.length+' hari');
+  }, err=>{
+    setCloudStatus('error','✕ '+err.message);
+  });
+}
+
+// ── Simpan state app (beban, harga, profil) ke Firebase ──────
+async function fbSaveAppState(){
+  if(!await fbInit()) return false;
+  try{
+    await fbPath(FB_ROOT+'/appstate').set({
+      bebanUsaha: state.bebanUsaha||[],
+      bebanId: state.bebanId||1,
+      harga: state.harga,
+      riwayatHarga: state.riwayatHarga||[],
+      profil: getProfil(),
+      updatedAt: new Date().toISOString()
+    });
+    return true;
+  }catch(e){ return false; }
+}
+
+// ── Muat app state dari Firebase ─────────────────────────────
+async function fbLoadAppState(){
+  if(!await fbInit()) return false;
+  try{
+    const snap = await fbPath(FB_ROOT+'/appstate').get();
+    if(snap.exists()){
+      const d = snap.val();
+      if(d.bebanUsaha) state.bebanUsaha = d.bebanUsaha;
+      if(d.bebanId)    state.bebanId    = d.bebanId;
+      if(d.harga)      state.harga      = {...state.harga,...d.harga};
+      if(d.riwayatHarga) state.riwayatHarga = d.riwayatHarga;
+      if(d.profil)     saveProfil(d.profil);
+      dbSave();
+    }
+    return true;
+  }catch(e){ return false; }
+}
+
+// ── Sync semua data lokal ke Firebase ────────────────────────
+async function fbSyncAll(){
+  if(!await fbInit()){toast('⚠ Firebase tidak terhubung');return;}
+  setCloudStatus('syncing','↻ Sync semua...');
+  let ok=0, fail=0;
+  for(const rec of state.savedData){
+    const r = await fbSaveDay(rec);
+    if(r) ok++; else fail++;
+  }
+  await fbSaveAppState();
+  if(fail===0){
+    toast('✓ '+ok+' hari data berhasil disinkronkan ke Firebase!');
+    setCloudStatus('active','● '+ok+' hari tersinkron');
+  }else{
+    toast('⚠ '+ok+' berhasil, '+fail+' gagal');
+    setCloudStatus('error','✕ '+fail+' data gagal');
+  }
+  if(e('main-content')&&currentPage==='database') renderDBPage(e('main-content'));
+}
+
+// ── Tes koneksi Firebase ─────────────────────────────────────
+async function testCloud(){
+  const btn = event?.target;
+  if(btn){btn.disabled=true;btn.textContent='↻ Testing...';}
+  const ok = await fbInit();
+  if(ok){
+    try{
+      await fbPath(FB_ROOT+'/ping').set({t:Date.now()});
+      toast('✓ Firebase terhubung! Multi-device aktif.');
+      setCloudStatus('active','● Firebase OK');
+    }catch(e){
+      toast('⚠ Firebase error: '+e.message);
+      setCloudStatus('error','✕ '+e.message);
+    }
+  }else{
+    toast('⚠ Firebase gagal terhubung');
+  }
+  if(btn){btn.disabled=false;btn.textContent='🔌 Test Koneksi';}
+}
+
+// ── Fungsi lama (kompatibilitas) — dialihkan ke Firebase ─────
+const CLOUD_KEY = 'spbu_firebase_active';
+function getCloudUrl(){ return localStorage.getItem(CLOUD_KEY)||(_fbInited?'firebase':''); }
+function setCloudUrl(url){ localStorage.setItem(CLOUD_KEY,url); }
+async function cloudSave(rec){ return {ok: await fbSaveDay(rec)}; }
+async function cloudLoad(){ return fbLoadAll(); }
+async function cloudSyncAll(){ return fbSyncAll(); }
+
+// ── Status indikator di topbar ────────────────────────────────
+function setCloudStatus(status, msg){
+  const dot   = document.querySelector('.db-dot');
+  const badge = document.querySelector('.db-badge');
+  const map = {
+    active:  {bg:'#4CAF50', text:'● Firebase Aktif'},
+    syncing: {bg:'#F5C518', text:'↻ Menyinkron...'},
+    error:   {bg:'#e53935', text:'✕ Gagal'},
+    loading: {bg:'#F5C518', text:'↻ Memuat...'},
+    local:   {bg:'#2196F3', text:'● Lokal'},
+  };
+  const s = map[status]||map.local;
+  if(dot)  dot.style.background = s.bg;
+  if(badge) badge.innerHTML = '<span class="db-dot" style="background:'+s.bg+'"></span> '+(msg||s.text);
+  updateBackupStatus();
+}
+
+
 
 function renderDBPage(main){
   const dbSize=JSON.stringify(state).length;
@@ -5828,6 +5989,51 @@ function renderDBPage(main){
     <div class="metric"><div class="metric-label">Ukuran Lokal</div><div class="metric-value">${dbSizeKb} KB</div><div class="metric-sub">localStorage</div></div>
     <div class="metric"><div class="metric-label">Mode</div><div class="metric-value" style="font-size:13px">${isCloud?'☁ Cloud+Lokal':'💾 Lokal Only'}</div></div>
     ${cloudStatusHtml}
+  </div>
+
+  <!-- FIREBASE PANEL -->
+  <div class="card" style="margin-bottom:12px;border:2px solid var(--blue-light)">
+    <div class="card-title" style="color:var(--blue)">☁ Firebase Multi-Device Sync</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius);padding:14px;text-align:center">
+        <div style="font-size:22px;margin-bottom:6px">📱</div>
+        <div style="font-size:12px;font-weight:700;color:var(--green)">Multi-Device</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">HP + Komputer bisa buka bersamaan</div>
+      </div>
+      <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);padding:14px;text-align:center">
+        <div style="font-size:22px;margin-bottom:6px">⚡</div>
+        <div style="font-size:12px;font-weight:700;color:var(--blue)">Real-Time</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Data muncul otomatis tanpa refresh</div>
+      </div>
+      <div style="background:var(--amber-bg);border:1px solid var(--amber-light);border-radius:var(--radius);padding:14px;text-align:center">
+        <div style="font-size:22px;margin-bottom:6px">🔒</div>
+        <div style="font-size:12px;font-weight:700;color:var(--amber)">Auto Backup</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:4px">Data aman di server Google</div>
+      </div>
+    </div>
+
+    <div style="background:var(--surface2);border-radius:var(--radius);padding:12px 14px;margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:4px">Status Koneksi</div>
+          <div class="db-badge" style="font-size:13px;font-weight:600">
+            <span class="db-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F5C518;margin-right:6px"></span>
+            Menghubungkan...
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary btn-sm" onclick="testCloud()">🔌 Test Koneksi</button>
+          <button class="btn btn-ghost btn-sm" onclick="fbSyncAll()">↻ Sync Semua ke Firebase</button>
+          <button class="btn btn-ghost btn-sm" onclick="fbLoadAll().then(()=>fbLoadAppState())">⬇ Ambil dari Firebase</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="padding:10px 12px;background:var(--surface2);border-radius:var(--radius);font-size:11px;color:var(--text2)">
+      💡 <strong>Cara berbagi ke device lain:</strong> Kirim file <code>spbu_manager.html</code> ini ke HP/komputer lain. 
+      Buka di browser → data otomatis terhubung ke Firebase yang sama. 
+      Tidak perlu install apapun.
+    </div>
   </div>
 
   <!-- BACKUP PANEL -->
@@ -6195,8 +6401,14 @@ function toggleMobileNav(){
 
 function init(){
   dbLoad();
-  checkAndRestoreBackup();  // Cek dan tawarkan restore jika data kosong
-  startAutoBackup();         // Mulai auto-backup berkala
+  checkAndRestoreBackup();
+  startAutoBackup();
+  // Init Firebase di background
+  fbInit().then(ok=>{
+    if(ok){
+      fbLoadAll().then(()=>fbLoadAppState()).then(()=>fbStartListener());
+    }
+  });
   const now=new Date();
   const tb=e('tb-date');
   if(tb)tb.textContent=now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
