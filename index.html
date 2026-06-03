@@ -681,7 +681,17 @@ let histChartInst=null;
 
 // ─── LOCALSTORAGE ────────────────────────────────────────────
 function dbSave(){try{localStorage.setItem(DB_KEY,JSON.stringify(state));}catch(err){toast('⚠ Gagal menyimpan ke database: '+err.message);}}
-function dbLoad(){try{const d=localStorage.getItem(DB_KEY);if(d){const p=JSON.parse(d);state={...state,...p};}}catch(e){toast('⚠ Gagal memuat database');}}
+function dbLoad(){
+  try{
+    const d=localStorage.getItem(DB_KEY);
+    if(d){
+      const p=JSON.parse(d);
+      // Deep merge: harga digabung (bukan ditimpa) agar key baru tetap ada
+      const mergedHarga={...state.harga,...(p.harga||{})};
+      state={...state,...p,harga:mergedHarga};
+    }
+  }catch(e){toast('⚠ Gagal memuat database');}
+}
 
 // ─── HELPERS ────────────────────────────────────────────────
 const e=id=>document.getElementById(id);
