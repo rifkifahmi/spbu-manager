@@ -658,6 +658,7 @@ const SI={pagi:{label:'Shift Pagi',hdr:'sh-p',dot:'dp',time:'06.00–14.00'},sia
 const DEF={pagi:{pertalite:{awal:0,jual:0,jual2:0,tambah:0},pertamax:{awal:0,jual:0,jual2:0,tambah:0},dexlite:{awal:0,jual:0,jual2:0,tambah:0},biosolar:{awal:0,jual:0,jual2:0,tambah:0}},siang:{pertalite:{jual:0,jual2:0,tambah:0},pertamax:{jual:0,jual2:0,tambah:0},dexlite:{jual:0,jual2:0,tambah:0},biosolar:{jual:0,jual2:0,tambah:0}},malam:{pertalite:{jual:0,jual2:0,tambah:0},pertamax:{jual:0,jual2:0,tambah:0},dexlite:{jual:0,jual2:0,tambah:0},biosolar:{jual:0,jual2:0,tambah:0}}};
 const CATS={gaji:{label:'Gaji/Upah',bg:'#EAF3DE',color:'#2D6A2D'},listrik:{label:'Listrik & Air',bg:'#E6F1FB',color:'#185FA5'},perawatan:{label:'Perawatan',bg:'#FAEEDA',color:'#854F0B'},administrasi:{label:'Administrasi',bg:'#EEEDFE',color:'#534AB7'},lainnya:{label:'Lain-lain',bg:'#F1EFE8',color:'#5F5E5A'}};
 const DB_KEY='spbu_manager_v1';
+const HARGA_KEY='spbu_harga_v1';  // Simpan harga terpisah agar cepat dimuat
 const AUTH_KEY='spbu_auth_session';
 const PWD_KEY='spbu_passwords';
 const PROFIL_KEY='spbu_profil';
@@ -896,12 +897,16 @@ let histChartInst=null;
 function dbSave(){try{localStorage.setItem(DB_KEY,JSON.stringify(state));setTimeout(()=>{try{autoBackupLocal();}catch(e){}},100);}catch(err){toast('⚠ Gagal menyimpan ke database: '+err.message);}}
 function dbLoad(){
   try{
+    // Muat harga dari localStorage terpisah DULU (paling cepat)
+    loadHargaLocal();
     const d=localStorage.getItem(DB_KEY);
     if(d){
       const p=JSON.parse(d);
       // Deep merge: harga digabung (bukan ditimpa) agar key baru tetap ada
       const mergedHarga={...state.harga,...(p.harga||{})};
       state={...state,...p,harga:mergedHarga};
+      // Muat ulang harga terpisah karena state merge bisa override
+      loadHargaLocal();
       // Migrasi menuAccess: pastikan menu baru ada di semua user
       const newMenus=['laporan'];
       if(state.users){
@@ -926,6 +931,17 @@ function dbLoad(){
       }catch(e){}
     }
   }catch(e){toast('⚠ Gagal memuat database');}
+}
+
+// Simpan harga ke localStorage terpisah (instant, tidak tunggu Firebase)
+function saveHargaLocal(){
+  try{localStorage.setItem(HARGA_KEY,JSON.stringify(state.harga));}catch(e){}
+}
+function loadHargaLocal(){
+  try{
+    const h=localStorage.getItem(HARGA_KEY);
+    if(h){const parsed=JSON.parse(h);state.harga={...state.harga,...parsed};}
+  }catch(e){}
 }
 
 // ─── HELPERS ────────────────────────────────────────────────
@@ -967,7 +983,9 @@ function simpanRiwayatHarga(tanggalBerlaku,keterangan=''){
   if(idx>=0) state.riwayatHarga[idx]=rec;
   else state.riwayatHarga.unshift(rec);
   state.riwayatHarga.sort((a,z)=>a.tanggal>z.tanggal?-1:1);
+  saveHargaLocal();
   dbSave();
+  if(_fbInited) fbSaveAppState().catch(()=>{});
 }
 const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 const esc=s=>(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -5466,6 +5484,7 @@ function updateHarga(b){
   const mgRaw=parseInt((e('mg-'+b)?.value||'').replace(/\./g,''))||0;
   const hppCalc=hjRaw-mgRaw; // HPP = Harga Jual - Margin
   state.harga[b]=hjRaw;state.harga['hpp_'+b]=hppCalc;
+  saveHargaLocal(); // Simpan ke localStorage SEKETIKA
   if(_fbInited) setTimeout(()=>fbSaveAppState().catch(()=>{}),500);
   const m=mgRaw;const pct=hjRaw>0?(m/hjRaw*100):0;
   // Update tampilan HPP otomatis
@@ -5676,7 +5695,7 @@ function exportBackupJSON(){
   const data={
     savedData:state.savedData,
     bebanUsaha:state.bebanUsaha||[],
-    harga:state.harga,
+    harga:state.harga,  // harga terbaru
     riwayatHarga:state.riwayatHarga||[],
     profil:getProfil(),
     exportedAt:new Date().toISOString(),
@@ -5943,24 +5962,38 @@ async function fbLoadAll(){
 // ── Realtime listener — auto-update saat ada perubahan ───────
 function fbStartListener(){
   if(!_fbInited||!_fbDb) return;
-  // Dengarkan perubahan data harian
+
+  // ── Listener 1: Data penjualan harian ───────────────────
   const ref = fbPath(FB_ROOT+'/data');
   ref.on('value', snap=>{
     if(!snap.exists()) return;
     const obj = snap.val();
     const rows = Object.values(obj).sort((a,b)=>a.tanggal>b.tanggal?-1:1);
-    // Merge: jangan timpa draft yang sedang diisi
-    const currentTgl = document.getElementById('f-tanggal')?.value;
     state.savedData = rows;
     dbSave();
-    // Update UI tanpa mengganggu form yang sedang diisi
     updateBackupStatus();
-    // Refresh dashboard/histori jika sedang dibuka
     if(currentPage==='dashboard') showPage('dashboard');
     if(currentPage==='histori')   showPage('histori');
     setCloudStatus('active','● Live · '+rows.length+' hari');
   }, err=>{
     setCloudStatus('error','✕ '+err.message);
+  });
+
+  // ── Listener 2: App state (harga, beban, profil) ─────────
+  const appRef = fbPath(FB_ROOT+'/appstate');
+  appRef.on('value', snap=>{
+    if(!snap.exists()) return;
+    const d = snap.val();
+    if(d.harga){
+      state.harga = {...state.harga,...d.harga};
+      saveHargaLocal(); // Simpan lokal agar tersedia offline
+      // Refresh halaman harga jika sedang dibuka
+      if(currentPage==='harga') showPage('harga');
+    }
+    if(d.bebanUsaha) state.bebanUsaha = d.bebanUsaha;
+    if(d.riwayatHarga) state.riwayatHarga = d.riwayatHarga;
+    if(d.profil) saveProfil(d.profil);
+    dbSave();
   });
 }
 
@@ -5989,7 +6022,10 @@ async function fbLoadAppState(){
       const d = snap.val();
       if(d.bebanUsaha) state.bebanUsaha = d.bebanUsaha;
       if(d.bebanId)    state.bebanId    = d.bebanId;
-      if(d.harga)      state.harga      = {...state.harga,...d.harga};
+      if(d.harga){
+        state.harga = {...state.harga,...d.harga};
+        saveHargaLocal(); // Simpan ke localStorage agar tersedia offline
+      }
       if(d.riwayatHarga) state.riwayatHarga = d.riwayatHarga;
       if(d.profil)     saveProfil(d.profil);
       dbSave();
