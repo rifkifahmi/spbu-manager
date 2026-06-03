@@ -1569,7 +1569,7 @@ function calcShift(sh){
     const st2=e(`${sh}-status-${b}`);
     if(st2){if(r.isLocked&&r.lockType==='losses'){let s=`<span class="bx bl">Losses 🔒</span>`;if(tambahMid>0)s+=` <span class="bx bn">+${fN(tambahMid)} baru</span>`;st2.innerHTML=s;}else if(r.isLocked&&r.lockType==='plus'){let s=`<span class="bx bp">Plus 🔒</span>`;if(tambahMid>0)s+=` <span class="bx bn">+${fN(tambahMid)} baru</span>`;st2.innerHTML=s;}else if(r.catatan<=BATAS[b]&&r.catatan>0){st2.innerHTML='<span class="bx bw">Rendah</span>';}else{st2.innerHTML='<span class="bx bk">OK</span>';}}
     if(r.isLocked&&r.lockType==='losses'){
-      let msg=`▲ <strong>${BL[b]}</strong>: Tangki habis — Losses = Stok ${fN(awal)} − Jual ${fN(jual)} = <strong>${fN(r.losses)} ltr 🔒</strong> — kerugian ${fRF(r.losses*gHJ(b))}.`;
+      let msg=`▲ <strong>${BL[b]}</strong>: Tangki habis — Losses = Stok ${fN(awal)} − Jual ${fN(jual)} = <strong>${fN(r.losses)} ltr 🔒</strong> — kerugian margin ${fRF(r.losses*(gHJ(b)-gHPP(b)))}.`;
       if(tambahMid>0&&jual2>0)msg+=` Tambah ${fN(tambahMid)} ltr → Jual lanjutan ${fN(jual2)} ltr → Stok akhir ${fN(r.stokAkhirEfektif)} ltr.`;
       else if(tambahMid>0)msg+=` Tambah ${fN(tambahMid)} ltr masuk sebagai stok baru → Stok akhir ${fN(r.stokAkhirEfektif)} ltr.`;
       notices.push(`<div class="nt nt-d">${msg}</div>`);
@@ -1914,7 +1914,7 @@ function showPreview(autoSave=false,update=false){
   const rows=BBM.map(b=>{
     const d=out[b];const vol=d.tJual+d.tPlus;
     const omzet=vol*gHJ(b),margin=vol*(gHJ(b)-gHPP(b));
-    const lRp=d.tLosses*gHJ(b),pRp=d.tPlus*gHJ(b);
+    const _mg3=gHJ(b)-gHPP(b);const lRp=d.tLosses*_mg3,pRp=d.tPlus*_mg3;
     tA+=d.awal;tJ+=d.tJual;tT+=d.tTambah;tK+=d.stokAkhir;tL+=d.tLosses;tP+=d.tPlus;tO+=omzet;tM+=margin;tLRp+=lRp;tPRp+=pRp;
     const shHtml=d.tLosses>0&&d.tPlus>0?'<span class="bx bl">L🔒</span><span class="bx bp">P🔒</span>':d.tLosses>0?'<span class="bx bl">Losses 🔒</span>':d.tPlus>0?`<span class="bx bp">+${fN(d.tPlus)} 🔒</span>`:'<span class="bx bk">Normal</span>';
     if(d.tLosses>0)notices.push(`<div class="nt nt-d">▲ <strong>${BL[b]}</strong>: Losses ${fN(d.tLosses)} ltr = ${fRF(lRp)} 🔒</div>`);
@@ -1987,7 +1987,7 @@ function saveData(){
   const{out}=getAkum();
   let tJual=0,tOmzet=0,tMargin=0,tLRp=0,tPRp=0;
   const hargaAktif=getHargaPadaTanggal(tanggal,'_snap_')||{};
-  BBM.forEach(b=>{const d=out[b];const vol=d.tJual+d.tPlus;const {hj,hpp}=getHargaPadaTanggal(tanggal,b);tJual+=vol;tOmzet+=vol*hj;tMargin+=vol*(hj-hpp);tLRp+=d.tLosses*hj;tPRp+=d.tPlus*hj;});
+  BBM.forEach(b=>{const d=out[b];const vol=d.tJual+d.tPlus;const {hj,hpp}=getHargaPadaTanggal(tanggal,b);const margin=hj-hpp;tJual+=vol;tOmzet+=vol*hj;tMargin+=vol*margin;tLRp+=d.tLosses*margin;tPRp+=d.tPlus*margin;});
   const ops=getTotalBiaya();
   const hargaSnapshot={...state.harga};
   const rec={tanggal,hari:e('f-hari')?.value||'',shifts:active,shiftData,biayaItems:[...state.biayaItems],ops,totalJual:tJual,totalOmzet:tOmzet,totalMargin:tMargin,tLRp,tPRp,labaBersih:tMargin-ops-tLRp+tPRp,hargaSnapshot,savedAt:new Date().toISOString()};
@@ -2057,7 +2057,7 @@ function renderStokPage(main){
 
   const fd=state.savedData[0];
   const ac=fd.shifts;let tA=0,tJ=0,tT=0,tK=0,tL=0,tP=0,tLRp=0,tPRp=0;
-  BBM.forEach(b=>{tA+=(fd.shiftData[ac[0]]?.[b]?.awal||0);ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};tJ+=d.jual||0;tT+=d.tambah||0;tL+=d.losses||0;tP+=d.plus||0;tLRp+=(d.losses||0)*gHJ(b);tPRp+=(d.plus||0)*gHJ(b);});tK+=(fd.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0);});
+  BBM.forEach(b=>{tA+=(fd.shiftData[ac[0]]?.[b]?.awal||0);const _hj=fd.hargaSnapshot?fd.hargaSnapshot[b]:gHJ(b);const _hpp=fd.hargaSnapshot?fd.hargaSnapshot['hpp_'+b]:gHPP(b);const _mg=_hj-_hpp;ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};tJ+=d.jual||0;tT+=d.tambah||0;tL+=d.losses||0;tP+=d.plus||0;tLRp+=(d.losses||0)*_mg;tPRp+=(d.plus||0)*_mg;});tK+=(fd.shiftData[ac[ac.length-1]]?.[b]?.stokAkhirEfektif||0);});
   const shiftNavBtns=ac.map((sh,i)=>`<button class="snavbtn${i===0?' active':''}" onclick="switchSV(this,'sv-${sh}')">${cap(sh)}</button>`).join('');
   const shiftViews=ac.map((sh,i)=>{
     const rows=BBM.map(b=>{const d=fd.shiftData[sh]?.[b]||{};const l=d.losses||0,p=d.plus||0,sb=d.stokBaru||0,sae=d.stokAkhirEfektif||0;const cHtml=d.isLocked?`<span class="pill ${d.lockType==='losses'?'pill-zero-l':'pill-zero-p'}">0 🔒</span>`:`<span class="pill pill-ok">${fN(d.catatan||0)}</span>`;const saeHtml=d.isLocked&&sb>0?`<span class="pill pill-new">${fN(sae)} baru</span>`:d.isLocked?`<span style="color:var(--text3)">0</span>`:`<span class="pill pill-ok">${fN(sae)}</span>`;return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td>${fN(d.awal||0)}</td><td>${fN(d.jual||0)}</td><td style="color:var(--green)">+${fN(d.tambah||0)}${d.tambah>0?'<br><small style="font-size:10px;color:var(--text3)">mid-shift</small>':''}</td><td>${cHtml}</td><td>${saeHtml}</td><td style="color:var(--red)">${l>0?'-'+fN(l)+' 🔒':'—'}</td><td style="color:var(--purple)">${p>0?'+'+fN(p)+' 🔒':'—'}</td></tr>`;}).join('');
@@ -2292,7 +2292,7 @@ function renderSelisihPage(main){
   const fd=state.savedData[0];
   if(!fd){main.innerHTML=`<div class="page-header"><div class="page-title">Losses & Plus</div></div><div class="card"><div class="empty-state">Belum ada data tersimpan.</div></div>`;return;}
   const ac=fd.shifts;let tLL=0,tLRp=0,tPL=0,tPRp=0;
-  BBM.forEach(b=>{ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};tLL+=d.losses||0;tLRp+=(d.losses||0)*gHJ(b);tPL+=d.plus||0;tPRp+=(d.plus||0)*gHJ(b);});});
+  BBM.forEach(b=>{const _hj2=fd.hargaSnapshot?fd.hargaSnapshot[b]:gHJ(b);const _hpp2=fd.hargaSnapshot?fd.hargaSnapshot['hpp_'+b]:gHPP(b);const _mg2=_hj2-_hpp2;ac.forEach(sh=>{const d=fd.shiftData[sh]?.[b]||{};tLL+=d.losses||0;tLRp+=(d.losses||0)*_mg2;tPL+=d.plus||0;tPRp+=(d.plus||0)*_mg2;});});
   const shiftNavBtns=ac.map((sh,i)=>`<button class="snavbtn${i===0?' active':''}" onclick="switchSV(this,'sev-${sh}')">${cap(sh)}</button>`).join('');
   const shiftViews=ac.map((sh,i)=>{
     const rows=BBM.map(b=>{const d=fd.shiftData[sh]?.[b]||{};const l=d.losses||0,p=d.plus||0;const lRp=l*gHJ(b),pRp=p*gHJ(b);const rumusL=l>0?`${fN(d.awal)}−${fN(d.jual)}=${fN(l)}`:'—';const rumusP=p>0?`${fN(d.jual)}−${fN(d.awal)}=${fN(p)}`:'—';const jenis=d.isLocked&&d.lockType==='losses'?'<span class="bx bl">Losses 🔒</span>':d.isLocked&&d.lockType==='plus'?'<span class="bx bp">Plus 🔒</span>':'<span class="bx bk">Normal</span>';return`<tr><td><span class="tag ${BT[b]}">${BL[b]}</span></td><td>${fN(d.awal||0)}</td><td>${fN(d.jual||0)}</td><td>${fN(d.tambah||0)}</td><td style="font-weight:700">${fN(d.stokAkhirEfektif||0)}</td><td>${jenis}</td><td style="color:var(--red);font-size:11px">${rumusL}</td><td style="color:var(--red);font-weight:700">${l>0?'-'+fN(l)+' 🔒':'—'}</td><td style="color:var(--red)">${l>0?'-'+fRF(lRp):'—'}</td><td style="color:var(--purple);font-size:11px">${rumusP}</td><td style="color:var(--purple);font-weight:700">${p>0?'+'+fN(p)+' 🔒':'—'}</td><td style="color:var(--purple)">${p>0?'+'+fRF(pRp):'—'}</td></tr>`;}).join('');
@@ -2517,9 +2517,10 @@ function renderLaporanPage(main){
         const sd=rec.shiftData[sh]?.[b]||{};
         const hj=hSnap?hSnap[b]:gHJ(b);
         const hpp=hSnap?hSnap['hpp_'+b]:gHPP(b);
+        const margin=hj-hpp;
         const jual=sd.jual||0; const losses=sd.losses||0; const plus=sd.plus||0;
-        const omzet=jual*hj; const laba=jual*(hj-hpp);
-        const lossesRp=losses*(hj-hpp);
+        const omzet=jual*hj; const laba=jual*margin;
+        const lossesRp=losses*margin;
         hariIni.shifts[sh].jual+=jual; hariIni.shifts[sh].omzet+=omzet;
         hariIni.shifts[sh].laba+=laba; hariIni.shifts[sh].losses+=losses;
         hariIni.shifts[sh].lossesRp+=lossesRp; hariIni.shifts[sh].plus+=plus;
