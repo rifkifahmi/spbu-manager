@@ -692,6 +692,14 @@ const fN=v=>Math.round(v).toLocaleString('id');
 const fR=v=>{const s=v<0?'-':'';const a=Math.abs(Math.round(v));if(a>=1e9)return s+'Rp '+(a/1e9).toFixed(2)+' M';if(a>=1e6)return s+'Rp '+(a/1e6).toFixed(1)+' jt';return s+'Rp '+a.toLocaleString('id')};
 const fRF=v=>{const s=v<0?'-':'';return s+'Rp '+Math.abs(Math.round(v)).toLocaleString('id')};
 const gHJ=b=>state.harga[b]||0;
+// Baca nilai jual2: coba dari field alt (mid-sec) dulu, fallback ke inline tabel
+function getJual2(sh,b){
+  const alt=e(`${sh}-jual2-alt-${b}`);
+  if(alt)return parseInt((alt.value||'0').replace(/\./g,''))||0;
+  const inline=e(`${sh}-jual2-${b}`);
+  if(inline)return parseInt((inline.value||'0').replace(/\./g,''))||0;
+  return 0;
+}
 const gHPP=b=>state.harga['hpp_'+b]||0;
 
 // Ambil harga yang berlaku pada tanggal tertentu dari riwayat
@@ -1069,7 +1077,7 @@ function renderShifts(){
         const pTambahTarget=getTambahTarget(prev);
         const pTambahCur=pTambahTarget==='current'?pTambah:0;
         const pTambahNext=pTambahTarget==='next'?pTambah:0;
-        const pJual2=parseInt((e(`${prev}-jual2-${b}`)?.value||'0').replace(/\./g,''))||0;
+        const pJual2=getJual2(prev,b);
         const pR=calcRow(pAwal,pJual,pTambahCur,pHabis,pJual2);
         prevShiftVal=Math.max(0,pR.stokAkhirEfektif+pTambahNext);
       }
@@ -1090,10 +1098,7 @@ function renderShifts(){
           <input type="text" id="${sh}-jual-${b}" value="${d.jual||0}" class="${jualStyle}" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px">
         </td>
         <td>
-          <input type="text" id="${sh}-jual2-${b}" value="${d.jual2||0}" class="inp inp-num ${gv_jual2_visible}" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px;display:none" placeholder="0">
-          <div id="${sh}-jual2-wrap-${b}" style="display:none">
-            <div style="font-size:9px;color:var(--green);margin-top:2px;white-space:nowrap">dari stok tambah</div>
-          </div>
+          <input type="text" id="${sh}-jual2-${b}" value="${d.jual2||0}" class="inp inp-num" ${lock?'readonly':''} oninput="onFC('${sh}','${b}')" style="width:90px;display:none" placeholder="0">
         </td>
         <td id="${sh}-catatan-cell-${b}">—</td>
         <td id="${sh}-sel-cell-${b}" style="font-size:11px;min-width:120px">—</td>
@@ -1115,13 +1120,13 @@ function renderShifts(){
         <div id="${sh}-stk-cur-${b}" class="cur-stk"></div>
       </div>`;
     }).join('');
-    // Grid input Jual 2 (penjualan dari stok tambah)
+    // Grid input Jual 2 — penjualan dari stok tambah mid-shift
     const jual2Grid=BBM.map(b=>{
-      const j2v=state.draft?.[sh]?.[b]?.jual2||0;
+      const j2v=(state.draft&&state.draft[sh]&&state.draft[sh][b])?state.draft[sh][b].jual2||0:0;
       return`<div class="fg">
         <label><span class="tag ${BT[b]}" style="font-size:10px">${BL[b]}</span></label>
-        <input type="text" id="${sh}-jual2-${b}" value="${j2v}" class="inp inp-num" ${saved?'readonly':''} oninput="onFC('${sh}','${b}')" style="background:var(--green-bg);border-color:var(--green-light);${saved?'opacity:.6':''}">
-        <div style="font-size:9px;color:var(--green);margin-top:2px">dari stok tambah</div>
+        <input type="text" id="${sh}-jual2-alt-${b}" value="${j2v}" class="inp inp-num inp-tambah" ${saved?'readonly':''} oninput="onJual2Change('${sh}','${b}')" style="${saved?'opacity:.6':''}">
+        <div id="${sh}-j2cur-${b}" class="cur-stk"></div>
       </div>`;
     }).join('');
     const tambahTargetSel=nextShift&&!saved?`
@@ -1177,44 +1182,25 @@ function renderShifts(){
           <tbody>${rows}</tbody>
         </table></div>
         <div class="tambah-sec" style="margin-top:14px;padding:14px;background:var(--surface2);border-radius:var(--radius);border:1px dashed var(--border2)">
-          <!-- Checkbox toggle mid-shift -->
           <label style="display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none${saved?';opacity:.5;pointer-events:none':''}">
-            <input type="checkbox" id="${sh}-midshift-chk" ${(state.midShift&&state.midShift[sh])?'checked':''} ${saved?'disabled':''} onchange="toggleMidShift('${sh}')" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
+            <input type="checkbox" id="${sh}-midshift-chk" ${(state.midShift&&state.midShift[sh])?"checked":""} ${saved?"disabled":""} onchange="toggleMidShift('${sh}')" style="width:16px;height:16px;accent-color:var(--green);cursor:pointer">
             <span style="font-size:13px;font-weight:600;color:var(--text)">+ Penambahan Stok Mid-Shift</span>
             <span class="mid-badge">MID-SHIFT</span>
             <span style="font-size:11px;color:var(--text3);font-weight:400">— centang jika ada pasokan BBM masuk di tengah shift</span>
           </label>
-
-          <!-- Section tambah + jual2 (muncul saat dicentang) -->
-          <div id="mid-sec-${sh}" style="display:${(state.midShift&&state.midShift[sh])?'block':'none'};margin-top:14px">
+          <div id="${sh}-mid-sec" style="display:${(state.midShift&&state.midShift[sh])?"block":"none"};margin-top:14px">
             <div style="font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Volume Penambahan per BBM</div>
             <div class="form-row cols-4">${tambahGrid}</div>
-            ${nextShift&&!saved?`
-            <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-              <span style="font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.05em">Masuk ke:</span>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text)">
-                <input type="radio" name="${sh}-tambah-target" id="${sh}-target-current" value="current" checked
-                  onchange="onTambahTargetChange('${sh}')"
-                  style="accent-color:var(--green);width:14px;height:14px">
-                <span class="bx ${SH_COLOR[sh]||'bk'}" style="font-size:11px">Shift ${cap(sh)}</span>
-                <span style="font-size:11px;color:var(--text3);font-weight:400">(berjalan)</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text)">
-                <input type="radio" name="${sh}-tambah-target" id="${sh}-target-next" value="next"
-                  onchange="onTambahTargetChange('${sh}')"
-                  style="accent-color:var(--amber);width:14px;height:14px">
-                <span class="bx ${SH_COLOR[nextShift]||'bw'}" style="font-size:11px">Shift ${cap(nextShift)}</span>
-                <span style="font-size:11px;color:var(--text3);font-weight:400">(berikutnya)</span>
-              </label>
-              <span id="${sh}-tambah-target-info" style="font-size:11px;color:var(--text2);margin-left:auto"></span>
-            </div>`:`<div class="nt nt-i" style="margin-bottom:10px;font-size:11px">ℹ Tidak ada shift berikutnya — penambahan langsung masuk stok shift ini.</div>`}
-
-            <!-- Jual 2: muncul jika target = current -->
-            <div id="${sh}-jual2-section" style="display:none">
-              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-                <span>Penjualan dari Stok Tambah</span>
-                <span style="background:var(--green-bg);color:var(--green);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700">JUAL 2</span>
-                <span style="font-size:10px;color:var(--text3);font-weight:400">— input penjualan setelah stok masuk</span>
+            <div style="margin-top:10px">
+              ${nextShift&&!saved
+                ?"<div style=\"background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:8px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:16px;flex-wrap:wrap\"><span style=\"font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase\">Masuk ke:</span><label style=\"display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600\"><input type=\"radio\" name=\"${sh}-tambah-target\" id=\"${sh}-target-current\" value=\"current\" checked onchange=\"onTambahTargetChange('${sh}')\" style=\"accent-color:var(--green);width:14px;height:14px\"><span class=\"bx ${SH_COLOR[sh]||'bk'}\" style=\"font-size:11px\">Shift ${cap(sh)} (berjalan)</span></label><label style=\"display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600\"><input type=\"radio\" name=\"${sh}-tambah-target\" id=\"${sh}-target-next\" value=\"next\" onchange=\"onTambahTargetChange('${sh}')\" style=\"accent-color:var(--amber);width:14px;height:14px\"><span class=\"bx ${SH_COLOR[nextShift]||'bw'}\" style=\"font-size:11px\">Shift ${cap(nextShift)} (berikutnya)</span></label><span id=\"${sh}-tambah-target-info\" style=\"font-size:11px;color:var(--text2);margin-left:auto\"></span></div>"
+                :"<div class=\"nt nt-i\" style=\"margin-bottom:10px;font-size:11px\">ℹ Tidak ada shift berikutnya — penambahan langsung masuk stok shift ini.</div>"}
+            </div>
+            <div id="${sh}-jual2-section" style="display:none;margin-top:12px;padding:12px;background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius)">
+              <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;display:flex;align-items:center;gap:8px">
+                <span>📦 Penjualan dari Stok Tambah</span>
+                <span style="background:var(--green);color:#fff;padding:2px 8px;border-radius:20px;font-size:10px">JUAL 2</span>
+                <span style="font-size:10px;color:var(--green);font-weight:400">— penjualan setelah stok masuk</span>
               </div>
               <div class="form-row cols-4">${jual2Grid}</div>
             </div>
@@ -1269,7 +1255,7 @@ function calcShift(sh){
     // Baca nilai jual: jika habis, gunakan nilai asli dari dataset (bukan 0)
     const jual=habis&&jEl?.dataset?.jualAsli?parseInt((jEl.dataset.jualAsli||'0').replace(/\./g,''))||0:gv(`${sh}-jual-${b}`);
     const tambah=gv(`${sh}-tambah-${b}`);
-    const jual2=gv(`${sh}-jual2-${b}`)||0;
+    const jual2=getJual2(sh,b);
     const r=calcRow(awal,jual,tambah,habis,jual2);
     if(jEl&&!state.shiftSaved[sh]){if(habis){
       // Simpan nilai jual asli sebelum dikunci — dipakai untuk hitung losses
@@ -1304,7 +1290,7 @@ function propagate(fromSh,toSh){
   BBM.forEach(b=>{
     const awal=gv(`${fromSh}-awal-${b}`);const habis=gck(`${fromSh}-habis-${b}`);
     const jual=gv(`${fromSh}-jual-${b}`);const tambah=gv(`${fromSh}-tambah-${b}`);
-    const jual2p1=gv(`${fromSh}-jual2-${b}`)||0;
+    const jual2p1=getJual2(fromSh,b);
     const r=calcRow(awal,jual,tambah,habis,jual2p1);
     const toEl=e(`${toSh}-awal-${b}`);
     if(toEl&&toEl.readOnly&&!state.shiftSaved[toSh]){
@@ -1324,6 +1310,22 @@ function calcAll(){
   updatePreviewIfOpen();
 }
 
+function onJual2Change(sh,b){
+  // Sync nilai jual2-alt ke jual2 inline (agar getJual2 konsisten)
+  const altEl=e(`${sh}-jual2-alt-${b}`);
+  const inlineEl=e(`${sh}-jual2-${b}`);
+  if(altEl&&inlineEl)inlineEl.value=altEl.value;
+  // Update info stok berjalan
+  const tambah=gv(`${sh}-tambah-${b}`)||0;
+  const j2=getJual2(sh,b);
+  const curEl=e(`${sh}-j2cur-${b}`);
+  if(curEl&&tambah>0){
+    const sisa=Math.max(0,tambah-j2);
+    curEl.textContent=`Sisa: ${fN(sisa)} ltr`;
+    curEl.style.color=sisa<1000?'var(--red)':'var(--green)';
+  }
+  onFC(sh,b);
+}
 function onFC(sh,b){
   // Simpan draft nilai saat ini ke state agar tidak hilang saat renderShifts
   if(!state.draft)state.draft={};
@@ -1412,7 +1414,7 @@ function propagate(fromSh,toSh){
     const tambahTarget=getTambahTarget(fromSh);
     const tambahForCurrent=tambahTarget==='current'?gv(`${fromSh}-tambah-${b}`):0;
     const tambahForNext=tambahTarget==='next'?gv(`${fromSh}-tambah-${b}`):0;
-    const jual2p2=gv(`${fromSh}-jual2-${b}`)||0;
+    const jual2p2=getJual2(fromSh,b);
     const r=calcRow(awal,jual,tambahForCurrent,habis,jual2p2);
     const toEl=e(`${toSh}-awal-${b}`);
     if(toEl&&toEl.readOnly&&!state.shiftSaved[toSh]){
@@ -1440,7 +1442,7 @@ function onTambahChange(sh,b){
       el2.style.color='var(--amber)';
     }else if(tambah>0){
       const awal=gv(`${sh}-awal-${b}`);const jual=gv(`${sh}-jual-${b}`);const habis=gck(`${sh}-habis-${b}`);
-      const jual2=gv(`${sh}-jual2-${b}`)||0;
+      const jual2=getJual2(sh,b);
       const r=calcRow(awal,jual,tambah,habis,jual2);
       el2.textContent=`Stok berjalan: ${fN(r.stokAkhirEfektif)} ltr`;
       el2.style.color='var(--green)';
@@ -1451,22 +1453,28 @@ function onTambahChange(sh,b){
 
 // Tampilkan kolom Jual 2 jika ada penambahan mid-shift untuk shift ini
 function toggleMidShift(sh){
-  // Toggle state mid-shift
   if(!state.midShift)state.midShift={pagi:false,siang:false,malam:false};
   state.midShift[sh]=!state.midShift[sh];
   const aktif=state.midShift[sh];
-  // Toggle visibilitas seksi tambah
-  const sec=e(`mid-sec-${sh}`);
+  // ID: "${sh}-mid-sec" sesuai HTML template
+  const sec=e(`${sh}-mid-sec`);
   if(sec)sec.style.display=aktif?'block':'none';
-  // Toggle visibilitas kolom jual2 di tabel
-  toggleJual2Visibility(sh);
-  // Reset nilai tambah dan jual2 jika dinonaktifkan
   if(!aktif){
     BBM.forEach(b=>{
-      const tEl=e(`${sh}-tambah-${b}`);if(tEl){tEl.value='0';}
-      const j2El=e(`${sh}-jual2-${b}`);if(j2El){j2El.value='0';}
+      const tEl=e(`${sh}-tambah-${b}`);if(tEl)tEl.value='0';
+      const j2El=e(`${sh}-jual2-${b}`);if(j2El)j2El.value='0';
+    });
+    // Sembunyikan jual2-section juga
+    const j2sec=e(`${sh}-jual2-section`);
+    if(j2sec)j2sec.style.display='none';
+    const thJ2=e(`${sh}-th-jual2`);
+    if(thJ2)thJ2.style.display='none';
+    BBM.forEach(b=>{
+      const j2El=e(`${sh}-jual2-${b}`);if(j2El)j2El.style.display='none';
     });
     calcAll();
+  } else {
+    toggleJual2Visibility(sh);
   }
 }
 
@@ -1475,18 +1483,16 @@ function toggleJual2Visibility(sh){
   const adaTambah=BBM.some(b=>gv(`${sh}-tambah-${b}`)>0);
   const midAktif=state.midShift&&state.midShift[sh];
   const tampilkan=midAktif&&adaTambah&&target==='current';
-  // Toggle section jual2 (di dalam mid-sec)
+  // Section Jual 2 di dalam mid-sec
   const sec=e(`${sh}-jual2-section`);
   if(sec)sec.style.display=tampilkan?'block':'none';
-  // Toggle header kolom jual2 di tabel
+  // Header kolom Jual 2 di tabel
   const thJual2=e(`${sh}-th-jual2`);
   if(thJual2)thJual2.style.display=tampilkan?'':'none';
-  // Toggle cell jual2 inline di tabel
+  // Field jual2 inline di tabel (display:none by default, muncul saat tampilkan=true)
   BBM.forEach(b=>{
     const j2El=e(`${sh}-jual2-${b}`);
-    const j2Wrap=e(`${sh}-jual2-wrap-${b}`);
     if(j2El)j2El.style.display=tampilkan?'block':'none';
-    if(j2Wrap)j2Wrap.style.display=tampilkan?'block':'none';
   });
 }
 
@@ -1503,7 +1509,7 @@ function getAkum(){
       const tambah=gv(`${sh}-tambah-${b}`)||0;
       const tambahTarget=getTambahTarget(sh);
       const tambahCur=tambahTarget==='current'?tambah:0;
-      const jual2ga=gv(`${sh}-jual2-${b}`)||0;
+      const jual2ga=getJual2(sh,b);
       const r=calcRow(a,jual,tambahCur,habis,jual2ga);
       tJual+=r.jualEfektif;tTambah+=tambah;tLosses+=r.losses;tPlus+=r.plus;stokAkhir=r.stokAkhirEfektif;
     });
@@ -1587,7 +1593,7 @@ function saveData(){
     // Baca nilai jual: jika habis, ambil dari dataset.jualAsli (nilai sebelum dikunci)
     const jElS=e(`${sh}-jual-${b}`);
     const jual=habis&&jElS?.dataset?.jualAsli?parseInt((jElS.dataset.jualAsli||'0').replace(/\./g,''))||0:gv(`${sh}-jual-${b}`)||0;
-    const jual2sd=gv(`${sh}-jual2-${b}`)||0;
+    const jual2sd=getJual2(sh,b);
     const tambah=gv(`${sh}-tambah-${b}`)||0;
     // Gunakan tambahTarget agar losses/plus dihitung benar
     const tambahTarget=getTambahTarget(sh);
