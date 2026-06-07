@@ -618,6 +618,9 @@ tr.row-saved{opacity:.8}
     <a class="nav-item" id="nav-penerimaan" onclick="showPage('penerimaan')" href="#">
       <span class="nav-icon">🚚</span> Penerimaan BBM
     </a>
+    <a class="nav-item" id="nav-lapbeli" onclick="showPage('lapbeli')" href="#">
+      <span class="nav-icon">💰</span> Laporan Pembelian
+    </a>
     <a class="nav-item" id="nav-forecast" onclick="showPage('forecast')" href="#">
       <span class="nav-icon">📡</span> Forecast Stok
     </a>
@@ -746,6 +749,7 @@ const ALL_MENUS=[
   {id:'histori',label:'Histori',icon:'📋'},
   {id:'laporan',label:'Laporan Harian',icon:'📰'},
   {id:'penerimaan',label:'Penerimaan BBM',icon:'🚚'},
+  {id:'lapbeli',label:'Laporan Pembelian',icon:'💰'},
   {id:'forecast',label:'Forecast Stok',icon:'📡'},
   {id:'stoklaporan',label:'Laporan Stok BBM',icon:'🛢'},
   {id:'beban',label:'Beban Usaha',icon:'📝'},
@@ -757,7 +761,7 @@ const ALL_MENUS=[
   {id:'database',label:'Database',icon:'💾'},
 ];
 const OWNER_DEFAULT_MENUS=ALL_MENUS.map(m=>m.id);
-const MANAGER_DEFAULT_MENUS=['input','stok','laba','selisih','histori','laporan','penerimaan','forecast','stoklaporan','beban','labarugi'];
+const MANAGER_DEFAULT_MENUS=['input','stok','laba','selisih','histori','laporan','penerimaan','lapbeli','forecast','stoklaporan','beban','labarugi'];
 
 function getUsers(){
   try{
@@ -922,7 +926,7 @@ function buildSidebar(){
 
   // Data — semua menu data termasuk laporan
   html+='<div class="nav-divider"></div><div class="nav-section">Data</div>';
-  ['histori','laporan','penerimaan','forecast','stoklaporan','beban','labarugi','rekap','lapkeu','harga','pengaturan'].forEach(m=>{
+  ['histori','laporan','penerimaan','lapbeli','forecast','stoklaporan','beban','labarugi','rekap','lapkeu','harga','pengaturan'].forEach(m=>{
     const def=ALL_MENUS.find(x=>x.id===m);
     if(!def)return;
     if(isOwner||userHasMenu(m))
@@ -1384,6 +1388,7 @@ function showPage(name){
   else if(name==='histori')renderHistoriPage(main);
   else if(name==='laporan')renderLaporanPage(main);
   else if(name==='penerimaan')renderPenerimaanPage(main);
+  else if(name==='lapbeli')renderLapBeliPage(main);
   else if(name==='forecast')renderForecastPage(main);
   else if(name==='stoklaporan')renderStokLaporanPage(main);
   else if(name==='beban')renderBebanPage(main);
@@ -1603,6 +1608,22 @@ function renderDashboardPage(main){
       </table></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
+      <!-- Widget Produk Masuk Hari Ini -->
+      ${(()=>{
+        const penHariIni=(state.penerimaan||[]).filter(p=>p.tanggal===todayDate);
+        if(!penHariIni.length)return'<div style="background:var(--surface2);border-radius:var(--radius);padding:10px 12px;margin-bottom:2px;font-size:12px;color:var(--text3)">📥 Tidak ada produk masuk hari ini</div>';
+        let totalNilaiH=0;
+        const bbmMasuk={};BBM.forEach(b=>bbmMasuk[b]=0);
+        penHariIni.forEach(p=>{BBM.forEach(b=>{bbmMasuk[b]+=(p.detail?.[b]?.volume||0);totalNilaiH+=(p.detail?.[b]?.nilai||0);});});
+        return'<div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);padding:10px 12px;margin-bottom:2px;cursor:pointer" onclick="showPage(&quot;lapbeli&quot;)">'
+          +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">📥 Produk Masuk Hari Ini</div>'
+          +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">'
+          +BBM.filter(b=>bbmMasuk[b]>0).map(b=>'<span class="tag '+BT[b]+'" style="font-size:10px">'+BL[b]+' '+fN(bbmMasuk[b])+'ltr</span>').join('')
+          +'</div>'
+          +'<div style="font-size:11px;font-weight:700;color:var(--red)">Modal: '+fRF(totalNilaiH)+'</div>'
+          +'<div style="font-size:10px;color:var(--text3);margin-top:2px">'+penHariIni.length+' DO masuk → klik detail</div>'
+          +'</div>';
+      })()}
       <div style="font-size:13px;font-weight:700;color:var(--text);padding:0 2px;text-transform:uppercase;letter-spacing:.06em">Aksi Cepat</div>
       <a onclick="showPage('rekap')" href="#" class="qa-card"><span class="qa-icon">📊</span><div class="qa-label">Rekap & Laporan</div></a>
       <a onclick="showPage('histori')" href="#" class="qa-card"><span class="qa-icon">📋</span><div class="qa-label">Histori Data</div></a>
@@ -3604,6 +3625,375 @@ function getForecastAlerts(){
   return BBM.map(b=>hitungForecast(b,14))
     .filter(Boolean)
     .filter(f=>f.status!=='aman');
+}
+
+
+
+// ═══════════════════════════════════════════════════════════════
+//  LAPORAN PEMBELIAN BBM
+//  Analisa modal, perputaran, dan proyeksi kebutuhan
+// ═══════════════════════════════════════════════════════════════
+let lbFilter = ''; // YYYY-MM
+
+function renderLapBeliPage(main){
+  if(!main)return;
+  const now=new Date();
+  const bulanIni=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  if(!lbFilter)lbFilter=bulanIni;
+
+  const bln=['Januari','Februari','Maret','April','Mei','Juni',
+             'Juli','Agustus','September','Oktober','November','Desember'];
+  const LB=v=>{if(!v)return'—';const[y,m]=v.split('-');return bln[parseInt(m)-1]+' '+y;};
+  const fTgl=t=>{if(!t)return'—';const[y,m,d]=t.split('-');return d+' '+bln[parseInt(m)-1].slice(0,3)+' '+y;};
+
+  // Daftar bulan tersedia
+  const bulanSet=new Set([bulanIni]);
+  (state.penerimaan||[]).forEach(p=>{if(p.tanggal)bulanSet.add(p.tanggal.slice(0,7));});
+  const bulanList=[...bulanSet].sort().reverse();
+
+  // ── Data penerimaan bulan ini ─────────────────────────────
+  const penBulan=(state.penerimaan||[])
+    .filter(p=>p.tanggal&&p.tanggal.slice(0,7)===lbFilter)
+    .sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+
+  // ── Agregasi per produk ────────────────────────────────────
+  const perBBM={};
+  BBM.forEach(b=>perBBM[b]={volume:0,nilai:0,dos:0,hargaRata:0});
+  let totalModal=0,totalVolume=0;
+
+  penBulan.forEach(p=>{
+    BBM.forEach(b=>{
+      if(p.detail?.[b]?.volume>0){
+        perBBM[b].volume+=p.detail[b].volume;
+        perBBM[b].nilai+=p.detail[b].nilai||0;
+        perBBM[b].dos++;
+      }
+    });
+    totalModal+=(p.totalNilai||BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0));
+  });
+  BBM.forEach(b=>{
+    totalVolume+=perBBM[b].volume;
+    perBBM[b].hargaRata=perBBM[b].volume>0?Math.round(perBBM[b].nilai/perBBM[b].volume):0;
+  });
+
+  // ── Analisa penjualan bulan ini untuk perputaran modal ────
+  const penjBulan=(state.savedData||[]).filter(d=>d.tanggal.slice(0,7)===lbFilter);
+  let totalOmzetBulan=0,totalLabaKotorBulan=0;
+  const volJualBBM={};BBM.forEach(b=>volJualBBM[b]=0);
+  penjBulan.forEach(rec=>{
+    totalOmzetBulan+=rec.totalOmzet||0;
+    const hSnap=rec.hargaSnapshot||null;
+    BBM.forEach(b=>{
+      rec.shifts.forEach(sh=>{
+        const jual=rec.shiftData[sh]?.[b]?.jual||0;
+        volJualBBM[b]+=jual;
+        const hj=hSnap?hSnap[b]:gHJ(b);
+        const hpp=hSnap?hSnap['hpp_'+b]:gHPP(b);
+        totalLabaKotorBulan+=jual*(hj-hpp);
+      });
+    });
+  });
+
+  // ── Kalkulasi perputaran modal ────────────────────────────
+  const ROI=totalModal>0?(totalLabaKotorBulan/totalModal*100):0;
+  const hariKerja=penjBulan.length||1;
+  const modalPerHari=totalModal/Math.max(penBulan.length||1,1);
+
+  // ── Rata-rata pembelian per DO ────────────────────────────
+  const totalDO=penBulan.length;
+  const modalPerDO=totalDO>0?totalModal/totalDO:0;
+
+  // ── Proyeksi bulan depan (berdasarkan tren) ───────────────
+  // Rata-rata volume jual per hari × 30 hari × HPP rata-rata
+  const volHariRata=BBM.reduce((s,b)=>s+volJualBBM[b],0)/hariKerja;
+  const hppRata=BBM.reduce((s,b)=>{
+    const v=volJualBBM[b];const hpp=gHPP(b);return s+v*hpp;
+  },0)/Math.max(BBM.reduce((s,b)=>s+volJualBBM[b],0),1);
+  const proyeksiModalBulanDepan=volHariRata*30*hppRata;
+
+  // ── Rekap per bulan (semua periode) ──────────────────────
+  const allBulan=[...new Set((state.penerimaan||[]).map(p=>p.tanggal?.slice(0,7)).filter(Boolean))].sort().reverse();
+
+  main.innerHTML=`
+  <div class="page-header">
+    <div>
+      <div class="page-title">💰 Laporan Pembelian BBM</div>
+      <div class="page-sub">Analisa modal, perputaran, dan proyeksi kebutuhan</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="printLapBeli('${lbFilter}')">🖨 Print</button>
+  </div>
+
+  <!-- Filter -->
+  <div class="card" style="padding:12px 16px;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:12px;font-weight:700;color:var(--text2)">PERIODE:</span>
+      <select class="inp" onchange="lbFilter=this.value;renderLapBeliPage(e('main-content'))"
+        style="width:180px;padding:5px 10px;font-size:13px;font-weight:600">
+        ${bulanList.map(b=>`<option value="${b}" ${b===lbFilter?'selected':''}>${LB(b)}</option>`).join('')}
+      </select>
+      <div style="margin-left:auto;font-size:12px;color:var(--text2)">
+        ${penBulan.length} kali pembelian · ${totalDO} DO
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI Modal -->
+  <div class="g4" style="gap:10px;margin-bottom:12px">
+    ${[
+      {l:'Total Modal Pembelian',v:fRF(totalModal),s:totalVolume?fN(totalVolume)+' ltr total':'-',c:'var(--red)',icon:'💸'},
+      {l:'Modal per DO',v:fRF(modalPerDO),s:totalDO+' kali pembelian',c:'var(--amber)',icon:'📋'},
+      {l:'Laba Kotor dari Modal',v:fRF(totalLabaKotorBulan),s:'ROI '+ROI.toFixed(1)+'%',c:'var(--green)',icon:'📈'},
+      {l:'Proyeksi Modal Bulan Depan',v:fRF(proyeksiModalBulanDepan),s:'basis '+hariKerja+' hari data',c:'var(--blue)',icon:'🔮'},
+    ].map(c=>`<div class="card" style="padding:14px;border-top:3px solid ${c.c}">
+      <div style="font-size:18px;margin-bottom:6px">${c.icon}</div>
+      <div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">${c.l}</div>
+      <div style="font-size:16px;font-weight:800;color:${c.c}">${c.v}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:4px">${c.s}</div>
+    </div>`).join('')}
+  </div>
+
+  <!-- Analisa Perputaran Modal -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+
+    <!-- Per Produk -->
+    <div class="card">
+      <div class="card-title">📦 Rincian per Produk — ${LB(lbFilter)}</div>
+      ${perBBM&&Object.values(perBBM).some(v=>v.volume>0)?`
+      <table class="stbl" style="font-size:12px">
+        <thead><tr>
+          <th>Produk</th>
+          <th style="text-align:right">Volume Beli</th>
+          <th style="text-align:right">HPP/ltr</th>
+          <th style="text-align:right">Total Modal</th>
+          <th style="text-align:right">Volume Jual</th>
+          <th style="text-align:right">Sisa Stok</th>
+        </tr></thead>
+        <tbody>
+        ${BBM.map(b=>{
+          if(!perBBM[b].volume&&!volJualBBM[b])return'';
+          const sisaLtr=perBBM[b].volume-volJualBBM[b];
+          const sisaNilai=sisaLtr*gHPP(b);
+          const terjual=perBBM[b].volume>0?(volJualBBM[b]/perBBM[b].volume*100):0;
+          return`<tr>
+            <td><span class="tag ${BT[b]}" style="font-size:11px">${BL[b]}</span></td>
+            <td style="text-align:right">${fN(perBBM[b].volume)} ltr</td>
+            <td style="text-align:right;font-size:11px">${fN(perBBM[b].hargaRata||gHPP(b))}</td>
+            <td style="text-align:right;color:var(--red);font-weight:600">${fRF(perBBM[b].nilai||perBBM[b].volume*gHPP(b))}</td>
+            <td style="text-align:right">${fN(volJualBBM[b])} ltr
+              <div style="height:3px;background:var(--surface2);border-radius:2px;margin-top:3px">
+                <div style="width:${Math.min(100,terjual).toFixed(0)}%;height:100%;background:var(--green);border-radius:2px"></div>
+              </div>
+            </td>
+            <td style="text-align:right;color:${sisaLtr<0?'var(--red)':sisaLtr<500?'var(--amber)':'var(--text)'}">
+              ${fN(Math.max(0,sisaLtr))} ltr<br>
+              <span style="font-size:10px;color:var(--text3)">${fRF(Math.max(0,sisaNilai))}</span>
+            </td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+        <tfoot><tr style="background:var(--surface2);font-weight:700">
+          <td>TOTAL</td>
+          <td style="text-align:right">${fN(totalVolume)} ltr</td>
+          <td></td>
+          <td style="text-align:right;color:var(--red)">${fRF(totalModal)}</td>
+          <td style="text-align:right">${fN(BBM.reduce((s,b)=>s+volJualBBM[b],0))} ltr</td>
+          <td></td>
+        </tr></tfoot>
+      </table>`
+      :`<div class="empty-state" style="padding:20px">Belum ada data pembelian ${LB(lbFilter)}.<br>
+        <a href="#" onclick="showPage('penerimaan');return false" style="color:var(--blue);font-size:12px">→ Input Penerimaan BBM</a>
+      </div>`}
+    </div>
+
+    <!-- Analisa Modal -->
+    <div class="card">
+      <div class="card-title">🔄 Analisa Perputaran Modal</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+
+        <div style="background:var(--green-bg);border:1px solid var(--green-light);border-radius:var(--radius);padding:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:8px">📊 Return on Investment (ROI)</div>
+          <div style="font-size:24px;font-weight:900;color:var(--green)">${ROI.toFixed(1)}%</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">
+            Laba Kotor ${fRF(totalLabaKotorBulan)} ÷ Modal ${fRF(totalModal)}
+          </div>
+          <div style="height:8px;background:var(--surface2);border-radius:4px;margin-top:8px;overflow:hidden">
+            <div style="width:${Math.min(100,ROI*5).toFixed(0)}%;height:100%;background:var(--green);border-radius:4px"></div>
+          </div>
+        </div>
+
+        <div style="background:var(--blue-bg);border:1px solid var(--blue-light);border-radius:var(--radius);padding:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">⏱ Estimasi Perputaran</div>
+          <div style="font-size:13px;font-weight:700">${totalModal>0&&totalOmzetBulan>0?(totalModal/totalOmzetBulan*30).toFixed(1)+' hari':'—'}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Modal kembali dalam estimasi X hari</div>
+        </div>
+
+        <div style="background:var(--amber-bg);border:1px solid var(--amber-light);border-radius:var(--radius);padding:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--amber);margin-bottom:6px">💰 Proyeksi Modal Bulan Depan</div>
+          <div style="font-size:18px;font-weight:800;color:var(--amber)">${fRF(proyeksiModalBulanDepan)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">
+            ~${fN(Math.round(volHariRata))} ltr/hari × 30 hari × HPP rata-rata
+          </div>
+        </div>
+
+        <div style="background:var(--surface2);border-radius:var(--radius);padding:12px">
+          <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px">📋 Rekomendasi Modal per DO</div>
+          ${BBM.map(b=>{
+            const volHariB=volJualBBM[b]/hariKerja;
+            const modalPerDoB=volHariB*7*gHPP(b); // 7 hari stok aman
+            if(!modalPerDoB)return'';
+            return`<div style="display:flex;justify-content:space-between;font-size:12px;padding:3px 0;border-bottom:1px solid var(--border)">
+              <span><span class="tag ${BT[b]}" style="font-size:10px">${BL[b]}</span></span>
+              <span style="font-weight:600">${fRF(modalPerDoB)}</span>
+            </div>`;
+          }).join('')}
+          <div style="font-size:10px;color:var(--text3);margin-top:6px">*Modal untuk stok 7 hari per produk</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- List Produk Masuk Harian -->
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">📥 List Produk Masuk Harian — ${LB(lbFilter)}</div>
+    ${penBulan.length===0?`<div class="empty-state">Belum ada data pembelian bulan ini.</div>`:`
+    <div class="tbl-wrap">
+    <table class="stbl" style="font-size:12px">
+      <thead><tr>
+        <th>Tanggal</th>
+        <th>No. DO</th>
+        <th>Supplier</th>
+        ${BBM.map(b=>`<th style="text-align:right">${BL[b]}<br><span style="font-size:9px;font-weight:400">(ltr)</span></th>`).join('')}
+        ${BBM.map(b=>`<th style="text-align:right">${BL[b]}<br><span style="font-size:9px;font-weight:400">(Rp)</span></th>`).join('')}
+        <th style="text-align:right">Total Modal</th>
+        <th style="text-align:center">Status</th>
+      </tr></thead>
+      <tbody>
+      ${penBulan.map(p=>{
+        const totalNilaiP=BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0);
+        return`<tr>
+          <td style="white-space:nowrap;font-weight:600">${fTgl(p.tanggal)}</td>
+          <td style="font-family:monospace;font-size:11px">
+            ${esc(p.noDO||'—')}
+            ${p.doTotal>1?`<div style="font-size:9px;color:var(--blue)">DO ${p.doKe}/${p.doTotal}</div>`:''}
+          </td>
+          <td style="font-size:11px">${esc(p.supplier||'—')}</td>
+          ${BBM.map(b=>`<td style="text-align:right;color:${p.detail?.[b]?.volume>0?'var(--blue)':'var(--text3)'}">
+            ${p.detail?.[b]?.volume>0?fN(p.detail[b].volume):'—'}
+          </td>`).join('')}
+          ${BBM.map(b=>`<td style="text-align:right;font-size:11px;color:var(--text2)">
+            ${p.detail?.[b]?.nilai>0?fRF(p.detail[b].nilai):'—'}
+          </td>`).join('')}
+          <td style="text-align:right;font-weight:700;color:var(--red)">${fRF(totalNilaiP)}</td>
+          <td style="text-align:center">
+            ${p.verified
+              ?'<span style="color:var(--green);font-size:11px">✓</span>'
+              :'<span style="color:var(--amber);font-size:11px">⏳</span>'}
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+      <tfoot><tr style="background:var(--red-bg);font-weight:700">
+        <td colspan="3">TOTAL ${LB(lbFilter)}</td>
+        ${BBM.map(b=>`<td style="text-align:right;color:var(--blue)">${fN(perBBM[b].volume)} ltr</td>`).join('')}
+        ${BBM.map(b=>`<td style="text-align:right">${fRF(perBBM[b].nilai)}</td>`).join('')}
+        <td style="text-align:right;color:var(--red)">${fRF(totalModal)}</td>
+        <td></td>
+      </tr></tfoot>
+    </table>
+    </div>`}
+  </div>
+
+  <!-- Rekap Semua Periode -->
+  <div class="card">
+    <div class="card-title">📅 Rekap Modal Semua Periode</div>
+    ${allBulan.length===0?`<div class="empty-state">Belum ada data penerimaan.</div>`:`
+    <table class="stbl" style="font-size:12px">
+      <thead><tr>
+        <th>Periode</th>
+        ${BBM.map(b=>`<th style="text-align:right">${BL[b]} (ltr)</th>`).join('')}
+        <th style="text-align:right">Total Modal</th>
+        <th style="text-align:right">DO</th>
+        <th style="text-align:center">Detail</th>
+      </tr></thead>
+      <tbody>
+      ${allBulan.map(bln2=>{
+        const pens=(state.penerimaan||[]).filter(p=>p.tanggal?.slice(0,7)===bln2);
+        const volBBM={};BBM.forEach(b=>volBBM[b]=0);
+        let totalM=0;
+        pens.forEach(p=>{BBM.forEach(b=>{volBBM[b]+=(p.detail?.[b]?.volume||0);totalM+=(p.detail?.[b]?.nilai||0);});});
+        return`<tr ${bln2===lbFilter?'style="background:var(--blue-bg)"':''}>
+          <td style="font-weight:600">${LB(bln2)}</td>
+          ${BBM.map(b=>`<td style="text-align:right">${volBBM[b]>0?fN(volBBM[b])+' ltr':'—'}</td>`).join('')}
+          <td style="text-align:right;font-weight:700;color:var(--red)">${fRF(totalM)}</td>
+          <td style="text-align:right;color:var(--text2)">${pens.length}×</td>
+          <td style="text-align:center">
+            <button class="btn btn-ghost btn-sm" onclick="lbFilter='${bln2}';renderLapBeliPage(e('main-content'))"
+              style="font-size:10px;padding:2px 8px">Detail</button>
+          </td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>`}
+  </div>
+  `;
+}
+
+// ── Print Laporan Pembelian ────────────────────────────────────
+function printLapBeli(bulan){
+  const bln=['Januari','Februari','Maret','April','Mei','Juni',
+             'Juli','Agustus','September','Oktober','November','Desember'];
+  const LB=v=>{if(!v)return'';const[y,m]=v.split('-');return bln[parseInt(m)-1]+' '+y;};
+  const fTgl=t=>{if(!t)return'—';const[y,m,d]=t.split('-');return d+' '+bln[parseInt(m)-1]+' '+y;};
+  const profil=getProfil();
+  const penBulan=(state.penerimaan||[]).filter(p=>p.tanggal?.slice(0,7)===bulan).sort((a,b)=>a.tanggal>b.tanggal?1:-1);
+  let totalModal=0;
+  const perBBM={};BBM.forEach(b=>perBBM[b]={volume:0,nilai:0});
+  penBulan.forEach(p=>{
+    BBM.forEach(b=>{perBBM[b].volume+=(p.detail?.[b]?.volume||0);perBBM[b].nilai+=(p.detail?.[b]?.nilai||0);});
+    totalModal+=BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0);
+  });
+
+  const w=window.open('','_blank','width=1000,height=700');
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Lap. Pembelian BBM '+LB(bulan)+'</title>'
+    +'<style>body{font-family:"Times New Roman",serif;font-size:12px;padding:20px 28px}'
+    +'table{width:100%;border-collapse:collapse;margin:10px 0}'
+    +'th{background:#f0f0f0;font-weight:bold;padding:5px 8px;border:1px solid #999;font-size:11px}'
+    +'td{padding:5px 8px;border:1px solid #ddd}.right{text-align:right}'
+    +'.tot{font-weight:bold;background:#e8e8e8;border-top:2px solid #999}'
+    +'@media print{@page{margin:1.5cm;size:A4 landscape}button{display:none}}</style></head><body>'
+    +'<div style="text-align:center;border-bottom:2px solid #000;padding-bottom:10px;margin-bottom:16px">'
+    +'<h2 style="margin:0;font-size:16px">'+(profil.namaSPBU||profil.nama||'SPBU')+'</h2>'
+    +'<h2 style="margin:4px 0;font-size:14px">LAPORAN PEMBELIAN BBM</h2>'
+    +'<div>Periode: '+LB(bulan)+'</div></div>'
+    +'<h3 style="font-size:12px;margin:0 0 6px">Ringkasan Modal per Produk</h3>'
+    +'<table><tr><th>Produk</th><th class="right">Volume (ltr)</th><th class="right">HPP Rata-rata</th><th class="right">Total Modal</th></tr>'
+    +BBM.map(b=>'<tr><td>'+BL[b]+'</td><td class="right">'+fN(perBBM[b].volume)+'</td>'
+      +'<td class="right">'+fN(perBBM[b].volume>0?Math.round(perBBM[b].nilai/perBBM[b].volume):0)+'</td>'
+      +'<td class="right">'+fRF(perBBM[b].nilai)+'</td></tr>').join('')
+    +'<tr class="tot"><td>TOTAL MODAL</td><td class="right">'+fN(BBM.reduce((s,b)=>s+perBBM[b].volume,0))+' ltr</td>'
+    +'<td></td><td class="right">'+fRF(totalModal)+'</td></tr></table>'
+    +'<h3 style="font-size:12px;margin:16px 0 6px">Detail Pembelian Harian</h3>'
+    +'<table><tr><th>Tanggal</th><th>No. DO</th><th>Supplier</th>'
+    +BBM.map(b=>'<th class="right">'+BL[b]+' (ltr)</th>').join('')
+    +BBM.map(b=>'<th class="right">'+BL[b]+' (Rp)</th>').join('')
+    +'<th class="right">Total</th><th>Status</th></tr>'
+    +penBulan.map(p=>{
+      const tn=BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0);
+      return'<tr><td>'+fTgl(p.tanggal)+'</td><td style="font-family:monospace;font-size:10px">'+esc(p.noDO||'—')+'</td><td>'+esc(p.supplier||'—')+'</td>'
+        +BBM.map(b=>'<td class="right">'+(p.detail?.[b]?.volume>0?fN(p.detail[b].volume):'—')+'</td>').join('')
+        +BBM.map(b=>'<td class="right">'+(p.detail?.[b]?.nilai>0?fRF(p.detail[b].nilai):'—')+'</td>').join('')
+        +'<td class="right">'+fRF(tn)+'</td>'
+        +'<td style="text-align:center">'+(p.verified?'✓ Verified':'Pending')+'</td></tr>';
+    }).join('')
+    +'<tr class="tot"><td colspan="3">TOTAL</td>'
+    +BBM.map(b=>'<td class="right">'+fN(perBBM[b].volume)+' ltr</td>').join('')
+    +BBM.map(b=>'<td class="right">'+fRF(perBBM[b].nilai)+'</td>').join('')
+    +'<td class="right">'+fRF(totalModal)+'</td><td></td></tr></table>'
+    +'<div style="margin-top:32px;display:flex;justify-content:flex-end;gap:60px">'
+    +'<div style="text-align:center"><div style="width:130px;border-top:1px solid #000;padding-top:4px;margin-top:40px">Mengetahui,</div><div>Owner</div></div>'
+    +'<div style="text-align:center"><div style="width:130px;border-top:1px solid #000;padding-top:4px;margin-top:40px">Dibuat oleh,</div><div>Manager</div></div>'
+    +'</div></body></html>';
+  w.document.write(html);w.document.close();setTimeout(()=>w.print(),500);
 }
 
 
