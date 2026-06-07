@@ -3907,52 +3907,143 @@ function renderLapBeliPage(main){
   <!-- List Produk Masuk Harian -->
   <div class="card" style="margin-bottom:12px">
     <div class="card-title">📥 List Produk Masuk Harian — ${LB(lbFilter)}</div>
-    ${penBulan.length===0?`<div class="empty-state">Belum ada data pembelian bulan ini.</div>`:`
-    <div class="tbl-wrap">
-    <table class="stbl" style="font-size:12px">
-      <thead><tr>
-        <th>Tanggal</th>
-        <th>No. DO</th>
-        <th>Supplier</th>
-        ${BBM.map(b=>`<th style="text-align:right">${BL[b]}<br><span style="font-size:9px;font-weight:400">(ltr)</span></th>`).join('')}
-        ${BBM.map(b=>`<th style="text-align:right">${BL[b]}<br><span style="font-size:9px;font-weight:400">(Rp)</span></th>`).join('')}
-        <th style="text-align:right">Total Modal</th>
-        <th style="text-align:center">Status</th>
-      </tr></thead>
-      <tbody>
-      ${penBulan.map(p=>{
-        const totalNilaiP=BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0);
-        return`<tr>
-          <td style="white-space:nowrap;font-weight:600">${fTgl(p.tanggal)}</td>
-          <td style="font-family:monospace;font-size:11px">
-            ${esc(p.noDO||'—')}
-            ${p.doTotal>1?`<div style="font-size:9px;color:var(--blue)">DO ${p.doKe}/${p.doTotal}</div>`:''}
-          </td>
-          <td style="font-size:11px">${esc(p.supplier||'—')}</td>
-          ${BBM.map(b=>`<td style="text-align:right;color:${p.detail?.[b]?.volume>0?'var(--blue)':'var(--text3)'}">
-            ${p.detail?.[b]?.volume>0?fN(p.detail[b].volume):'—'}
-          </td>`).join('')}
-          ${BBM.map(b=>`<td style="text-align:right;font-size:11px;color:var(--text2)">
-            ${p.detail?.[b]?.nilai>0?fRF(p.detail[b].nilai):'—'}
-          </td>`).join('')}
-          <td style="text-align:right;font-weight:700;color:var(--red)">${fRF(totalNilaiP)}</td>
-          <td style="text-align:center">
-            ${p.verified
-              ?'<span style="color:var(--green);font-size:11px">✓</span>'
-              :'<span style="color:var(--amber);font-size:11px">⏳</span>'}
-          </td>
-        </tr>`;
-      }).join('')}
-      </tbody>
-      <tfoot><tr style="background:var(--red-bg);font-weight:700">
-        <td colspan="3">TOTAL ${LB(lbFilter)}</td>
-        ${BBM.map(b=>`<td style="text-align:right;color:var(--blue)">${fN(perBBM[b].volume)} ltr</td>`).join('')}
-        ${BBM.map(b=>`<td style="text-align:right">${fRF(perBBM[b].nilai)}</td>`).join('')}
-        <td style="text-align:right;color:var(--red)">${fRF(totalModal)}</td>
-        <td></td>
-      </tr></tfoot>
-    </table>
-    </div>`}
+
+    ${(()=>{
+      // Kumpulkan semua penambahan stok dari data shift per hari
+      const hariMasuk={};
+      penjBulanAll.forEach(rec=>{
+        const tgl=rec.tanggal;
+        if(!hariMasuk[tgl])hariMasuk[tgl]={tanggal:tgl,hari:rec.hari||'',midShift:{},normal:{},total:{}};
+        BBM.forEach(b=>{
+          if(!hariMasuk[tgl].midShift[b])hariMasuk[tgl].midShift[b]=0;
+          if(!hariMasuk[tgl].normal[b])hariMasuk[tgl].normal[b]=0;
+          if(!hariMasuk[tgl].total[b])hariMasuk[tgl].total[b]=0;
+          rec.shifts.forEach(sh=>{
+            const sd=rec.shiftData[sh]?.[b]||{};
+            hariMasuk[tgl].midShift[b]+=(sd.tambah||0);
+            hariMasuk[tgl].normal[b]+=(sd.tambahNormal||0);
+          });
+          hariMasuk[tgl].total[b]=hariMasuk[tgl].midShift[b]+hariMasuk[tgl].normal[b];
+        });
+      });
+
+      const rows=Object.values(hariMasuk)
+        .filter(d=>BBM.some(b=>d.total[b]>0))
+        .sort((a,z)=>a.tanggal>z.tanggal?1:-1);
+
+      if(!rows.length)return`<div class="empty-state">
+        Tidak ada penambahan stok di ${LB(lbFilter)}.<br>
+        <span style="font-size:11px;color:var(--text3)">Data diambil dari field "Tambah Mid-Shift" dan "Tambah Normal" di Input Data</span>
+      </div>`;
+
+      // Total per produk seluruh bulan
+      const totalMidBulan={};const totalNormalBulan={};const grandTotal={};
+      BBM.forEach(b=>{totalMidBulan[b]=0;totalNormalBulan[b]=0;grandTotal[b]=0;});
+      rows.forEach(d=>{BBM.forEach(b=>{
+        totalMidBulan[b]+=d.midShift[b];
+        totalNormalBulan[b]+=d.normal[b];
+        grandTotal[b]+=d.total[b];
+      });});
+
+      return`
+      <!-- Ringkasan per Produk -->
+      <div class="g4" style="gap:8px;margin-bottom:12px">
+        ${BBM.map(b=>{
+          const tot=grandTotal[b];
+          const nilaiEst=tot*gHPP(b);
+          if(!tot)return`<div class="card" style="padding:10px;opacity:.4;border-top:3px solid var(--border)">
+            <span class="tag ${BT[b]}" style="font-size:11px">${BL[b]}</span>
+            <div style="font-size:13px;color:var(--text3);margin-top:6px">Tidak ada masuk</div>
+          </div>`;
+          return`<div class="card" style="padding:10px;border-top:3px solid var(--blue)">
+            <span class="tag ${BT[b]}" style="font-size:11px">${BL[b]}</span>
+            <div style="font-size:20px;font-weight:800;margin-top:6px">${fN(tot)}</div>
+            <div style="font-size:11px;color:var(--text2)">liter masuk bulan ini</div>
+            <div style="font-size:12px;color:var(--amber);margin-top:4px;font-weight:600">${fRF(nilaiEst)}</div>
+            <div style="font-size:10px;color:var(--text3);margin-top:2px">
+              Mid: ${fN(totalMidBulan[b])} · Normal: ${fN(totalNormalBulan[b])}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+
+      <!-- Tabel Harian -->
+      <div class="tbl-wrap">
+      <table class="stbl" style="font-size:12px">
+        <thead>
+          <tr style="background:var(--surface2)">
+            <th rowspan="2">Tanggal</th>
+            <th rowspan="2">Hari</th>
+            ${BBM.map(b=>`<th colspan="2" style="text-align:center;border-bottom:1px solid var(--border)">
+              <span class="tag ${BT[b]}" style="font-size:10px">${BL[b]}</span>
+            </th>`).join('')}
+            <th colspan="2" rowspan="2" style="text-align:center">Total Masuk</th>
+          </tr>
+          <tr style="background:var(--surface2)">
+            ${BBM.map(()=>`
+              <th style="text-align:right;font-size:10px;color:var(--blue)">Mid-Shift</th>
+              <th style="text-align:right;font-size:10px;color:var(--amber)">Normal</th>
+            `).join('')}
+          </tr>
+        </thead>
+        <tbody>
+        ${rows.map(d=>{
+          const totalVolHari=BBM.reduce((s,b)=>s+d.total[b],0);
+          const totalNilaiHari=BBM.reduce((s,b)=>s+d.total[b]*gHPP(b),0);
+          const adaMid=BBM.some(b=>d.midShift[b]>0);
+          const adaNormal=BBM.some(b=>d.normal[b]>0);
+          return`<tr>
+            <td style="font-weight:600;white-space:nowrap">${fTgl(d.tanggal)}</td>
+            <td style="font-size:11px;color:var(--text2)">${d.hari||'—'}</td>
+            ${BBM.map(b=>`
+              <td style="text-align:right;color:${d.midShift[b]>0?'var(--blue)':'var(--text3)'};font-weight:${d.midShift[b]>0?600:400}">
+                ${d.midShift[b]>0?fN(d.midShift[b]):'—'}
+              </td>
+              <td style="text-align:right;color:${d.normal[b]>0?'var(--amber)':'var(--text3)'};font-weight:${d.normal[b]>0?600:400}">
+                ${d.normal[b]>0?fN(d.normal[b]):'—'}
+              </td>
+            `).join('')}
+            <td style="text-align:right;font-weight:700">${fN(totalVolHari)} ltr</td>
+            <td style="text-align:right;font-size:11px;color:var(--amber)">${fRF(totalNilaiHari)}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+        <tfoot>
+          <tr style="background:var(--blue-bg);font-weight:700">
+            <td colspan="2">TOTAL Mid-Shift</td>
+            ${BBM.map(b=>`
+              <td style="text-align:right;color:var(--blue)">${totalMidBulan[b]>0?fN(totalMidBulan[b]):'—'}</td>
+              <td></td>
+            `).join('')}
+            <td style="text-align:right;color:var(--blue)">${fN(BBM.reduce((s,b)=>s+totalMidBulan[b],0))} ltr</td>
+            <td style="text-align:right;color:var(--blue)">${fRF(BBM.reduce((s,b)=>s+totalMidBulan[b]*gHPP(b),0))}</td>
+          </tr>
+          <tr style="background:var(--amber-bg);font-weight:700">
+            <td colspan="2">TOTAL Normal</td>
+            ${BBM.map(b=>`
+              <td></td>
+              <td style="text-align:right;color:var(--amber)">${totalNormalBulan[b]>0?fN(totalNormalBulan[b]):'—'}</td>
+            `).join('')}
+            <td style="text-align:right;color:var(--amber)">${fN(BBM.reduce((s,b)=>s+totalNormalBulan[b],0))} ltr</td>
+            <td style="text-align:right;color:var(--amber)">${fRF(BBM.reduce((s,b)=>s+totalNormalBulan[b]*gHPP(b),0))}</td>
+          </tr>
+          <tr style="background:var(--surface2);font-weight:800">
+            <td colspan="2">GRAND TOTAL</td>
+            ${BBM.map(b=>`
+              <td style="text-align:right;font-weight:700">${grandTotal[b]>0?fN(grandTotal[b]):''}</td>
+              <td></td>
+            `).join('')}
+            <td style="text-align:right;color:var(--red)">${fN(BBM.reduce((s,b)=>s+grandTotal[b],0))} ltr</td>
+            <td style="text-align:right;color:var(--red)">${fRF(BBM.reduce((s,b)=>s+grandTotal[b]*gHPP(b),0))}</td>
+          </tr>
+        </tfoot>
+      </table>
+      </div>
+      <div style="margin-top:8px;font-size:11px;color:var(--text3);padding:0 2px">
+        💡 Data dari field <strong>Tambah Mid-Shift</strong> (biru) dan <strong>Tambah Normal</strong> (kuning) di Input Data.
+        Nilai rupiah dihitung dari HPP (Harga Jual − Margin) yang berlaku.
+      </div>`;
+    })()}
   </div>
 
   <!-- Kalkulator Modal Minimal Mingguan -->
