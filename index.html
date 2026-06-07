@@ -1120,9 +1120,13 @@ function showActivationScreen(reason, extraData){
     <!-- Form aktivasi -->
     <div style="text-align:left;margin-bottom:16px">
       <label style="font-size:12px;font-weight:700;color:#444;display:block;margin-bottom:6px">NAMA SPBU (sesuai saat order)</label>
-      <input type="text" id="lic-nama" placeholder="cth: SPBU 64.751.14 Mataram"
-        style="width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none"
-        onfocus="this.style.borderColor='#185FA5'" onblur="this.style.borderColor='#ddd'">
+      <input type="text" id="lic-nama" placeholder="cth: SPBU 64.751.14 MATARAM"
+        style="width:100%;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;box-sizing:border-box;outline:none;text-transform:uppercase;letter-spacing:.3px"
+        onfocus="this.style.borderColor='#185FA5'" onblur="this.style.borderColor='#ddd'"
+        oninput="document.getElementById('lic-nama-preview').textContent=this.value.toUpperCase().trim()">
+      <div style="margin-top:4px;font-size:11px;color:#888">
+        Akan dicocokkan sebagai: <strong id="lic-nama-preview" style="color:#185FA5;font-family:monospace"></strong>
+      </div>
     </div>
     <div style="text-align:left;margin-bottom:20px">
       <label style="font-size:12px;font-weight:700;color:#444;display:block;margin-bottom:6px">KODE AKTIVASI</label>
@@ -1169,8 +1173,9 @@ function licFormatInput(el){
 
 // ── Proses aktivasi ───────────────────────────────────────────
 function activateLicense(){
-  const namaRaw=(document.getElementById('lic-nama')?.value||'').trim();
-  const kode=(document.getElementById('lic-kode')?.value||'').trim().toUpperCase();
+  // Normalisasi: uppercase, trim, ganti spasi ganda jadi tunggal
+  const namaRaw=(document.getElementById('lic-nama')?.value||'').trim().replace(/\s+/g,' ');
+  const kode=(document.getElementById('lic-kode')?.value||'').trim().toUpperCase().replace(/[^A-F0-9\-]/g,'');
   const errEl=document.getElementById('lic-err');
 
   if(!namaRaw){
@@ -1208,7 +1213,9 @@ function activateLicense(){
   }
 
   if(!foundExpiry){
-    errEl.textContent='❌ Kode tidak valid. Pastikan nama SPBU sama persis dengan saat order.';
+    errEl.innerHTML='❌ Kode tidak valid.<br>'
+      +'<span style="font-size:10px;color:#888">Nama yang dicek: <strong style="font-family:monospace;color:#185FA5">'+nama+'</strong></span><br>'
+      +'<span style="font-size:10px;color:#888">Pastikan nama SPBU persis sama dengan saat order (sudah otomatis kapital semua).</span>';
     errEl.style.display='block';
     return;
   }
