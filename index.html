@@ -3955,6 +3955,144 @@ function renderLapBeliPage(main){
     </div>`}
   </div>
 
+  <!-- Kalkulator Modal Minimal Mingguan -->
+  <div class="card" id="kalkulator-modal" style="margin-bottom:12px;border:2px solid var(--green-light)">
+    <div class="card-title" style="color:var(--green)">🧮 Kalkulator Modal Minimal Mingguan</div>
+    ${(()=>{
+      // Ambil data 30 hari terakhir untuk rata-rata
+      const sorted=[...state.savedData].sort((a,z)=>a.tanggal>z.tanggal?-1:1);
+      const data30=sorted.slice(0,30);
+      if(!data30.length)return'<div class="empty-state">Butuh minimal 1 hari data untuk kalkulasi.</div>';
+
+      const hariKerja=data30.length;
+
+      // Rata-rata volume per hari per BBM
+      const volHari={};BBM.forEach(b=>volHari[b]=0);
+      data30.forEach(rec=>{
+        BBM.forEach(b=>{rec.shifts.forEach(sh=>{volHari[b]+=(rec.shiftData[sh]?.[b]?.jual||0);});});
+      });
+      BBM.forEach(b=>volHari[b]=volHari[b]/hariKerja);
+
+      // Rata-rata biaya operasional per hari
+      const totalOps=data30.reduce((s,d)=>s+(d.ops||0),0);
+      const opsPerHari=totalOps/hariKerja;
+
+      // Kalkulasi modal per komponen
+      const modalBBM7={};let totalBBM7=0;
+      BBM.forEach(b=>{
+        const hpp=gHPP(b);
+        modalBBM7[b]=Math.round(volHari[b]*hpp*7);
+        totalBBM7+=modalBBM7[b];
+      });
+
+      const safetyStock=Math.round(totalBBM7/7*2); // 2 hari buffer
+      const opsMingguan=Math.round(opsPerHari*7);
+      const modalMinimal=totalBBM7+safetyStock+opsMingguan;
+      const modalIdeal=Math.round(modalMinimal*1.15);
+      const modalKonservatif=Math.round(modalMinimal*1.25);
+
+      // Perputaran modal
+      const totalOmzet30=data30.reduce((s,d)=>s+(d.totalOmzet||0),0);
+      const omzetPerHari=totalOmzet30/hariKerja;
+      const hariKembali=omzetPerHari>0?(modalMinimal/omzetPerHari).toFixed(1):'—';
+
+      return''
+        // Info basis kalkulasi
+        +'<div style="background:var(--surface2);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--text2)">'
+        +'📊 Basis kalkulasi: <strong>'+hariKerja+' hari data</strong> terakhir'
+        +' · Rata-rata omzet/hari: <strong>'+fRF(omzetPerHari)+'</strong>'
+        +'</div>'
+
+        // Tabel rincian per produk
+        +'<div style="overflow-x:auto;margin-bottom:14px">'
+        +'<table class="stbl" style="font-size:12px">'
+        +'<thead><tr>'
+        +'<th>Produk</th>'
+        +'<th style="text-align:right">Rata Jual/hari</th>'
+        +'<th style="text-align:right">HPP/ltr</th>'
+        +'<th style="text-align:right">Modal 7 hari</th>'
+        +'<th style="text-align:right">Safety 2 hari</th>'
+        +'<th style="text-align:right">Total per Produk</th>'
+        +'</tr></thead><tbody>'
+        +BBM.map(b=>{
+          const hpp=gHPP(b);
+          const safety=Math.round(volHari[b]*hpp*2);
+          const total=modalBBM7[b]+safety;
+          return'<tr>'
+            +'<td><span class="tag '+BT[b]+'" style="font-size:11px">'+BL[b]+'</span></td>'
+            +'<td style="text-align:right">'+fN(Math.round(volHari[b]))+' ltr</td>'
+            +'<td style="text-align:right">'+fN(hpp)+'</td>'
+            +'<td style="text-align:right">'+fRF(modalBBM7[b])+'</td>'
+            +'<td style="text-align:right;color:var(--amber)">'+fRF(safety)+'</td>'
+            +'<td style="text-align:right;font-weight:700">'+fRF(total)+'</td>'
+            +'</tr>';
+        }).join('')
+        +'</tbody>'
+        +'<tfoot><tr style="background:var(--surface2);font-weight:700">'
+        +'<td colspan="3">Subtotal Modal BBM + Safety</td>'
+        +'<td style="text-align:right;color:var(--red)">'+fRF(totalBBM7)+'</td>'
+        +'<td style="text-align:right;color:var(--amber)">'+fRF(safetyStock)+'</td>'
+        +'<td style="text-align:right;color:var(--red)">'+fRF(totalBBM7+safetyStock)+'</td>'
+        +'</tr></tfoot>'
+        +'</table></div>'
+
+        // Ringkasan modal
+        +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px">'
+
+        +'<div style="background:var(--surface2);border-radius:var(--radius);padding:14px">'
+        +'<div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:4px">Modal BBM 7 Hari</div>'
+        +'<div style="font-size:16px;font-weight:800;color:var(--red)">'+fRF(totalBBM7)+'</div>'
+        +'<div style="font-size:11px;color:var(--text3);margin-top:2px">Pembelian BBM saja</div>'
+        +'</div>'
+
+        +'<div style="background:var(--amber-bg);border:1px solid var(--amber-light);border-radius:var(--radius);padding:14px">'
+        +'<div style="font-size:10px;font-weight:700;color:var(--amber);text-transform:uppercase;margin-bottom:4px">+ Safety Stock 2 Hari</div>'
+        +'<div style="font-size:16px;font-weight:800;color:var(--amber)">'+fRF(safetyStock)+'</div>'
+        +'<div style="font-size:11px;color:var(--text3);margin-top:2px">Buffer stok darurat</div>'
+        +'</div>'
+
+        +'<div style="background:var(--surface2);border-radius:var(--radius);padding:14px">'
+        +'<div style="font-size:10px;font-weight:700;color:var(--text2);text-transform:uppercase;margin-bottom:4px">+ Biaya Operasional</div>'
+        +'<div style="font-size:16px;font-weight:800">'+fRF(opsMingguan)+'</div>'
+        +'<div style="font-size:11px;color:var(--text3);margin-top:2px">Gaji, listrik, dll/minggu</div>'
+        +'</div>'
+
+        +'</div>'
+
+        // Total rekomendasi
+        +'<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">'
+
+        +'<div style="background:var(--green-bg);border:2px solid var(--green-light);border-radius:var(--radius);padding:14px;text-align:center">'
+        +'<div style="font-size:11px;font-weight:700;color:var(--green);margin-bottom:6px">✓ MODAL MINIMAL</div>'
+        +'<div style="font-size:20px;font-weight:900;color:var(--green)">'+fRF(modalMinimal)+'</div>'
+        +'<div style="font-size:11px;color:var(--text2);margin-top:4px">Pas-pasan, rawan kehabisan</div>'
+        +'</div>'
+
+        +'<div style="background:var(--blue-bg);border:2px solid var(--blue-light);border-radius:var(--radius);padding:14px;text-align:center">'
+        +'<div style="font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px">⭐ MODAL IDEAL (+15%)</div>'
+        +'<div style="font-size:20px;font-weight:900;color:var(--blue)">'+fRF(modalIdeal)+'</div>'
+        +'<div style="font-size:11px;color:var(--text2);margin-top:4px">Direkomendasikan untuk operasional lancar</div>'
+        +'</div>'
+
+        +'<div style="background:var(--purple-bg,var(--surface2));border:2px solid var(--border);border-radius:var(--radius);padding:14px;text-align:center">'
+        +'<div style="font-size:11px;font-weight:700;color:var(--purple);margin-bottom:6px">🛡 MODAL KONSERVATIF (+25%)</div>'
+        +'<div style="font-size:20px;font-weight:900;color:var(--purple)">'+fRF(modalKonservatif)+'</div>'
+        +'<div style="font-size:11px;color:var(--text2);margin-top:4px">Aman untuk demand tinggi / keterlambatan DO</div>'
+        +'</div>'
+
+        +'</div>'
+
+        // Info perputaran
+        +'<div style="background:var(--surface2);border-radius:var(--radius);padding:12px 14px;font-size:12px">'
+        +'<div style="display:flex;gap:24px;flex-wrap:wrap">'
+        +'<div>⏱ <strong>Estimasi modal kembali:</strong> '+hariKembali+' hari dari omzet penjualan</div>'
+        +'<div>📈 <strong>Omzet mingguan:</strong> '+fRF(omzetPerHari*7)+'</div>'
+        +'<div>💡 <strong>Tips:</strong> Siapkan modal untuk 9 hari (7 + 2 buffer) agar tidak pernah kehabisan stok</div>'
+        +'</div>'
+        +'</div>';
+    })()}
+  </div>
+
   <!-- Rekap Semua Periode -->
   <div class="card">
     <div class="card-title">📅 Rekap Modal Semua Periode</div>
