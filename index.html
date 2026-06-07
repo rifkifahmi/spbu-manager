@@ -3651,14 +3651,14 @@ function renderLapBeliPage(main){
   (state.penerimaan||[]).forEach(p=>{if(p.tanggal)bulanSet.add(p.tanggal.slice(0,7));});
   const bulanList=[...bulanSet].sort().reverse();
 
-  // ── Data penerimaan bulan ini ─────────────────────────────
+  // ── Data penerimaan bulan ini (dari modul Penerimaan BBM) ──
   const penBulan=(state.penerimaan||[])
     .filter(p=>p.tanggal&&p.tanggal.slice(0,7)===lbFilter)
     .sort((a,b)=>a.tanggal>b.tanggal?1:-1);
 
-  // ── Agregasi per produk ────────────────────────────────────
+  // ── Agregasi dari Penerimaan BBM (DO resmi) ────────────────
   const perBBM={};
-  BBM.forEach(b=>perBBM[b]={volume:0,nilai:0,dos:0,hargaRata:0});
+  BBM.forEach(b=>perBBM[b]={volume:0,nilai:0,dos:0,hargaRata:0,dariShift:0,nilaiShift:0});
   let totalModal=0,totalVolume=0;
 
   penBulan.forEach(p=>{
@@ -3671,10 +3671,49 @@ function renderLapBeliPage(main){
     });
     totalModal+=(p.totalNilai||BBM.reduce((s,b)=>s+(p.detail?.[b]?.nilai||0),0));
   });
+
+  // ── Tambah dari data tambah shift (fallback/pelengkap) ─────
+  // Harga beli (HPP) = Harga Jual - Margin
+  const penjBulanAll=(state.savedData||[]).filter(d=>d.tanggal.slice(0,7)===lbFilter);
+  penjBulanAll.forEach(rec=>{
+    const hSnap=rec.hargaSnapshot||null;
+    BBM.forEach(b=>{
+      rec.shifts.forEach(sh=>{
+        const sd=rec.shiftData[sh]?.[b]||{};
+        const tambahMid=sd.tambah||0;       // tambah mid-shift
+        const tambahNorm=sd.tambahNormal||0; // tambah normal
+        const totalTambah=tambahMid+tambahNorm;
+        if(totalTambah>0){
+          const hpp=hSnap?hSnap['hpp_'+b]:gHPP(b);
+          perBBM[b].dariShift+=totalTambah;
+          perBBM[b].nilaiShift+=totalTambah*hpp;
+        }
+      });
+    });
+  });
+
+  // Jika tidak ada data Penerimaan BBM, gunakan data shift sebagai estimasi
+  BBM.forEach(b=>{
+    if(perBBM[b].volume===0&&perBBM[b].dariShift>0){
+      perBBM[b].volume=perBBM[b].dariShift;
+      perBBM[b].nilai=perBBM[b].nilaiShift;
+      // tandai sebagai estimasi
+      perBBM[b].isEstimasi=true;
+    }
+    if(perBBM[b].volume===0&&perBBM[b].dariShift>0)
+      totalModal+=perBBM[b].nilaiShift;
+  });
+  // Hitung ulang totalModal jika ada campuran
+  totalModal=BBM.reduce((s,b)=>s+perBBM[b].nilai,0);
+
   BBM.forEach(b=>{
     totalVolume+=perBBM[b].volume;
     perBBM[b].hargaRata=perBBM[b].volume>0?Math.round(perBBM[b].nilai/perBBM[b].volume):0;
   });
+
+  // Apakah ada data yang menggunakan estimasi shift
+  const adaEstimasi=BBM.some(b=>perBBM[b].isEstimasi);
+  const semuaDariShift=penBulan.length===0&&BBM.some(b=>perBBM[b].dariShift>0);
 
   // ── Analisa penjualan bulan ini untuk perputaran modal ────
   const penjBulan=(state.savedData||[]).filter(d=>d.tanggal.slice(0,7)===lbFilter);
@@ -3735,6 +3774,13 @@ function renderLapBeliPage(main){
         ${penBulan.length} kali pembelian · ${totalDO} DO
       </div>
     </div>
+    ${semuaDariShift?`<div style="margin-top:8px;padding:7px 12px;background:var(--amber-bg);border-radius:var(--radius);font-size:11px;color:var(--amber)">
+      ⚡ <strong>Data dari Tambah Stok (Estimasi)</strong> — Belum ada data Penerimaan BBM bulan ini.
+      Modal dihitung dari volume tambah shift × HPP (Harga Jual - Margin).
+      <a href="#" onclick="showPage('penerimaan');return false" style="color:var(--blue);margin-left:4px">→ Input Penerimaan BBM untuk data akurat</a>
+    </div>`:adaEstimasi?`<div style="margin-top:8px;padding:7px 12px;background:var(--surface2);border-radius:var(--radius);font-size:11px;color:var(--text2)">
+      ℹ Sebagian data menggunakan estimasi dari tambah stok (HPP = Harga Jual - Margin)
+    </div>`:''}
   </div>
 
   <!-- KPI Modal -->
@@ -3762,11 +3808,12 @@ function renderLapBeliPage(main){
       <table class="stbl" style="font-size:12px">
         <thead><tr>
           <th>Produk</th>
-          <th style="text-align:right">Volume Beli</th>
+          <th style="text-align:right">Volume Masuk</th>
           <th style="text-align:right">HPP/ltr</th>
           <th style="text-align:right">Total Modal</th>
           <th style="text-align:right">Volume Jual</th>
           <th style="text-align:right">Sisa Stok</th>
+          <th style="text-align:center">Sumber</th>
         </tr></thead>
         <tbody>
         ${BBM.map(b=>{
@@ -3787,6 +3834,11 @@ function renderLapBeliPage(main){
             <td style="text-align:right;color:${sisaLtr<0?'var(--red)':sisaLtr<500?'var(--amber)':'var(--text)'}">
               ${fN(Math.max(0,sisaLtr))} ltr<br>
               <span style="font-size:10px;color:var(--text3)">${fRF(Math.max(0,sisaNilai))}</span>
+            </td>
+            <td style="text-align:center;font-size:10px">
+              ${perBBM[b].isEstimasi
+                ?'<span style="color:var(--amber)" title="Estimasi dari tambah stok">⚡ Estimasi</span>'
+                :'<span style="color:var(--green)" title="Dari data Penerimaan BBM">✓ DO</span>'}
             </td>
           </tr>`;
         }).join('')}
